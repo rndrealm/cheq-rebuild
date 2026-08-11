@@ -53,7 +53,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     emailAndPassword: {
       enabled: true,
     },
-    trustedOrigins: ["https://cheq.localhost"],
+    trustedOrigins: ["https://cheq.localhost", "https://cheq-rebuild.vercel.app"],
     plugins: [
       username(),
       convex({ authConfig }),
