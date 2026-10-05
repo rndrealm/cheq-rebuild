@@ -10,44 +10,87 @@ export type BetStatus =
   | "cancelled"
   | "flagged";
 
+export type StatusConfig = {
+  label: string;
+  text: string;
+  border: string;
+  gradient: string;
+  insetShadow: string;
+  textShadow: string;
+};
+
 export function getStatusConfig(
   status: BetStatus,
   isWinner: boolean | null,
-): { label: string; bg: string; text: string } {
+): StatusConfig {
   switch (status) {
     case "pending":
-      return {
-        label: "Pending",
-        bg: "bg-warning-light/60",
-        text: "text-warning",
-      };
     case "countered":
       return {
-        label: "Countered",
-        bg: "bg-warning-light/60",
-        text: "text-warning",
+        label: status === "pending" ? "Pending" : "Countered",
+        text: "text-[#d97706]",
+        border: "border-[#fdd889]",
+        gradient: "from-[#fdd889] from-[29%] to-[#fcc85c]",
+        insetShadow:
+          "shadow-[inset_-1px_-1px_0px_0px_#f5ba3b,inset_1px_1px_0px_0px_#feeec4]",
+        textShadow: "[text-shadow:0px_0.5px_0px_#f5c23b]",
       };
     case "active":
-      return { label: "Active", bg: "bg-info-light/60", text: "text-info" };
+      return {
+        label: "Active",
+        text: "text-[#059fff]",
+        border: "border-[#a6d2ff]",
+        gradient: "from-[#a6d2ff] from-[29%] to-[#85c1ff]",
+        insetShadow:
+          "shadow-[inset_-1px_-1px_0px_0px_#70b8ff,inset_1px_1px_0px_0px_#dbedff]",
+        textShadow: "[text-shadow:0px_0.5px_0px_#72b8fe]",
+      };
     case "resolved":
       return isWinner
-        ? { label: "Won", bg: "bg-success-light/60", text: "text-success" }
+        ? {
+            label: "Won",
+            text: "text-[#16a34a]",
+            border: "border-[#86efac]",
+            gradient: "from-[#86efac] from-[29%] to-[#6be096]",
+            insetShadow:
+              "shadow-[inset_-1px_-1px_0px_0px_#4ad67f,inset_1px_1px_0px_0px_#c5f5d6]",
+            textShadow: "[text-shadow:0px_0.5px_0px_#4ad680]",
+          }
         : {
             label: "Lost",
-            bg: "bg-destructive/10",
-            text: "text-destructive",
+            text: "text-[#dc2626]",
+            border: "border-[#fca5a5]",
+            gradient: "from-[#fca5a5] from-[29%] to-[#f87171]",
+            insetShadow:
+              "shadow-[inset_-1px_-1px_0px_0px_#ef5350,inset_1px_1px_0px_0px_#fdd]",
+            textShadow: "[text-shadow:0px_0.5px_0px_#ef5350]",
           };
     case "tied":
-      return { label: "Tied", bg: "bg-bg-300", text: "text-fg-400" };
     case "expired":
-      return { label: "Expired", bg: "bg-bg-300", text: "text-fg-300" };
     case "cancelled":
-      return { label: "Cancelled", bg: "bg-bg-300", text: "text-fg-300" };
+      return {
+        label:
+          status === "tied"
+            ? "Tied"
+            : status === "expired"
+              ? "Expired"
+              : "Cancelled",
+        text: "text-[#737373]",
+        border: "border-[#d4d4d4]",
+        gradient: "from-[#e5e5e5] from-[29%] to-[#d4d4d4]",
+        insetShadow:
+          "shadow-[inset_-1px_-1px_0px_0px_#c4c4c4,inset_1px_1px_0px_0px_#f0f0f0]",
+        textShadow: "[text-shadow:0px_0.5px_0px_#c4c4c4]",
+      };
     case "flagged":
       return {
         label: "Flagged",
-        bg: "bg-destructive/10",
-        text: "text-destructive",
+        text: "text-[#dc2626]",
+        border: "border-[#fca5a5]",
+        gradient: "from-[#fca5a5] from-[29%] to-[#f87171]",
+        insetShadow:
+          "shadow-[inset_-1px_-1px_0px_0px_#ef5350,inset_1px_1px_0px_0px_#fdd]",
+        textShadow: "[text-shadow:0px_0.5px_0px_#ef5350]",
       };
   }
 }

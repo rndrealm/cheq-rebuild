@@ -1,0 +1,447 @@
+/* Typed custom properties for animation interpolation */
+@property --slider-complete {
+  initial-value: 0;
+  inherits: true;
+  syntax: '<integer>';
+}
+@property --slider-liquid {
+  initial-value: 0;
+  inherits: true;
+  syntax: '<integer>';
+}
+
+/* ========== Color Scheme (required for light-dark() and system colors) ========== */
+html {
+  color-scheme: light dark;
+}
+
+[data-theme='light'] {
+  color-scheme: light only;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark only;
+}
+
+/* ========== Utilities ========== */
+.liquid-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ========== Slider Container ========== */
+.slider {
+  --width: 300;
+  --height: 50;
+  --border: 0px;
+  --checked: #007AFF;
+  --unchecked: hsl(218, 8%, 81%);
+  --transition: 0.12s;
+  --ease: ease-out;
+  display: flex;
+  border-radius: 12px;
+  color: white;
+  width: calc(var(--width) * 1px);
+  max-width: calc(100vw - 2rem);
+  align-items: center;
+  position: relative;
+  container-type: inline-size;
+}
+
+/* ========== Icon Positioning ========== */
+.slider svg {
+  color: color-mix(in oklch, canvas, canvasText 30%);
+  position: absolute;
+  pointer-events: none;
+  width: 32px;
+  aspect-ratio: 1;
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.slider svg:nth-of-type(1) {
+  right: calc(100% + 1.25rem);
+}
+
+.slider svg:nth-of-type(2) {
+  width: 56px;
+  left: calc(100% + 1.25rem);
+}
+
+/* ========== Slider Track ========== */
+.slider__track {
+  flex: 1;
+  height: calc(var(--height) * 1px);
+  position: relative;
+  container-type: inline-size;
+}
+
+.slider__fill {
+  height: 30%;
+  border-radius: 12px;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  top: 50%;
+  translate: 0 -50%;
+  clip-path: inset(0 0 0 0 round 12px);
+  pointer-events: none;
+  background: color-mix(in oklch, canvas, canvasText 15%);
+}
+
+.slider__fill::after {
+  content: '';
+  width: 120%;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: var(--checked);
+  clip-path: inset(0 0 0 0 round 12px);
+  transform: translateX(-100%);
+  transition: translate 0.12s ease-out;
+  translate: calc(var(--slider-complete) * 1cqi) 0%;
+}
+
+/* ========== Range Input ========== */
+.slider input {
+  width: 100%;
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  opacity: 0;
+}
+
+.slider [type='range'] {
+  height: calc(var(--height) * 1px);
+  outline: none;
+  opacity: 0;
+  z-index: 99999;
+  cursor: -webkit-grab;
+}
+
+.slider [type='range']:active {
+  cursor: -webkit-grabbing;
+  cursor: none;
+}
+
+.slider:has(:focus-visible) {
+  outline: 2px solid var(--checked);
+  outline-offset: 4px;
+}
+
+/* ========== Knockout (Transparency Overlay) ========== */
+.knockout {
+  height: calc(var(--height) * 1px);
+  width: calc(var(--width) * 1px);
+  border-radius: 100px;
+  filter: url(#remove-black);
+  position: absolute;
+  inset: 0;
+  will-change: filter, scale;
+  transform: translate3d(0, 0, 0);
+}
+
+/* ========== Indicator Mask (Black Knockout Circle) ========== */
+.slider .indicator--masked {
+  background: transparent;
+  z-index: 12;
+  height: 100%;
+  width: 100%;
+  translate: -50% -50%;
+  container-type: inline-size;
+  border-radius: 100px;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  scale: 1;
+}
+
+.indicator--masked .mask {
+  position: absolute;
+  height: calc(100% - (2 * var(--border)));
+  top: 50%;
+  background: #000;
+  left: var(--border);
+  border-radius: 100px;
+  transition-property: height, width, margin, scale, translate;
+  transition-duration: var(--transition), var(--transition), var(--transition), var(--transition), 0.12s;
+  transition-timing-function: var(--ease), var(--ease), var(--ease), var(--ease), ease-out;
+  will-change: height, width, margin;
+}
+
+.slider .indicator--masked .mask {
+  width: 62px;
+  translate: calc((var(--slider-complete) / 100) * (100cqi - 100%)) -50%;
+}
+
+/* ========== Wrapper (Blur Container) ========== */
+.wrapper {
+  position: absolute;
+  inset: 0;
+  border-radius: 100px;
+  clip-path: inset(0 0 0 0 round 100px);
+  filter: blur(6px);
+  transition: filter var(--transition) var(--ease);
+}
+
+/* ========== Liquids (Goo Filter Targets) ========== */
+.liquids {
+  position: absolute;
+  inset: 0;
+  transform: translate3d(0, 0, 0);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.slider .liquids {
+  filter: url(#goo) blur(0px);
+}
+
+.liquids--fill {
+  z-index: 20;
+}
+
+.liquids--track {
+  --checked: color-mix(in oklch, canvas, canvasText 15%);
+}
+
+/* ========== Liquid Shadows ========== */
+.liquids .liquid__shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: 100px;
+}
+
+.slider .liquids .liquid__shadow {
+  box-shadow:
+    inset 0px 0px 3px 4px var(--checked),
+    inset calc(((var(--slider-liquid) / 100) * 2px) + (2px - (var(--slider-liquid) / 100) * 4px))
+      0px
+      calc(2px + (var(--slider-liquid) / 100) * 1px)
+      calc(1px + ((var(--slider-liquid) / 100) * 1px))
+      var(--checked);
+}
+
+.slider .liquids--fill .liquid__shadow {
+  opacity: calc(var(--slider-liquid) / 50);
+}
+
+/* ========== Liquid Tracks (The Colored Bars) ========== */
+.liquids .liquid__track {
+  content: '';
+  height: calc((var(--height) * 1px) - (0 * var(--border)));
+  width: calc((var(--width) * 1px) - (0 * var(--border)));
+  background: var(--checked);
+  border-radius: 100px;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transition-property: height, width, filter, left, translate;
+  transition-duration: var(--transition), var(--transition), var(--transition), var(--transition), 0.12s;
+  transition-timing-function: var(--ease), var(--ease), var(--ease), var(--ease), ease-out;
+}
+
+/* Fill liquid: slides based on --slider-liquid */
+.slider .liquid__track {
+  translate: calc(-100% + (var(--slider-liquid) / 100) * (100cqi)) -50%;
+}
+
+/* Track liquid: fixed position, grey color (MUST come after .slider .liquid__track for same-specificity override) */
+.liquids--track .liquid__track {
+  translate: 8cqi -50%;
+  background: color-mix(in oklch, canvas, canvasText 15%);
+}
+
+/* ========== Indicator Liquid (The Thumb) ========== */
+.indicator__liquid {
+  position: absolute;
+  height: calc(100% - (2 * var(--border)));
+  width: calc(60% - (2 * var(--border)));
+  container-type: inline-size;
+  top: 50%;
+  background: canvas;
+  left: var(--border);
+  border-radius: 100px;
+  transition-property: scale, translate;
+  transition-duration: var(--transition), 0.12s;
+  transition-timing-function: var(--ease), ease-out;
+}
+
+.slider .indicator__liquid {
+  width: 62px;
+  height: 100%;
+  background: canvas;
+  box-shadow:
+    inset 1px -1px 2px #ffffff80,
+    inset 0 -1px 2px #ffffff80,
+    inset -1px -1px 2px #ffffff80,
+    inset 1px 1px 2px #4d4d4d80,
+    inset -8px 4px 10px -6px #4d4d4d40,
+    inset -1px 1px 6px #4d4d4d40,
+    -1px -1px 8px #99999926,
+    1px 1px 2px #4d4d4d26,
+    2px 2px 6px #4d4d4d26,
+    inset -2px -1px 2px #ffffff40,
+    3px 6px 16px -6px #4d4d4d80;
+  translate: calc(((var(--slider-complete) / 100) * (100cqi - 100%))) -50%;
+}
+
+/* ========== Glass Shadow Overlay ========== */
+.indicator__liquid .shadow {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  border-radius: 100px;
+  box-shadow:
+    1px -1px 2px light-dark(hsl(0 0% 100% / 0.5), hsl(0 0% 0% / 0.25)) inset,
+    0px -1px 2px light-dark(hsl(0 0% 100% / 0.5), hsl(0 0% 0% / 0.25)) inset,
+    -1px -1px 2px light-dark(hsl(0 0% 100% / 0.5), hsl(0 0% 0% / 0.25)) inset,
+    1px 1px 2px light-dark(hsl(0 0% 30% / 0.5), hsl(0 0% 0% / 0.25)) inset,
+    -8px 4px 10px -6px light-dark(hsl(0 0% 30% / 0.25), hsl(0 0% 0% / 0.25)) inset,
+    -1px 1px 6px light-dark(hsl(0 0% 30% / 0.25), hsl(0 0% 0% / 0.25)) inset,
+    -1px -1px 8px light-dark(hsl(0 0% 60% / 0.15), hsl(0 0% 0% / 0.25)),
+    1px 1px 2px light-dark(hsl(0 0% 30% / 0.15), hsl(0 0% 0% / 0.25)),
+    2px 2px 6px light-dark(hsl(0 0% 30% / 0.15), hsl(0 0% 0% / 0.25)),
+    inset -2px -1px 2px light-dark(hsl(0 0% 100% / 0.25), hsl(0 0% 0% / 0.25)),
+    3px 6px 16px -6px light-dark(hsl(0 0% 30% / 0.5), hsl(0 0% 0% / 0.25));
+  z-index: 20;
+  transition: opacity var(--transition) var(--ease);
+}
+
+/* ========== White Cover (Hides Liquids When Inactive) ========== */
+.indicator__liquid .cover {
+  position: absolute;
+  inset: 0;
+  background: light-dark(white, hsl(0 0% 80%));
+  border-radius: 100px;
+  transition: opacity var(--transition) var(--ease);
+}
+
+/* ========== Active States ========== */
+.slider:active .indicator--masked .mask,
+.slider[data-active='true'] .indicator--masked .mask {
+  scale: calc(1.4 + (var(--delta, 0) * 0.05)) calc(1.4 - (var(--delta, 0) * 0.05));
+}
+
+.slider:active .indicator__liquid,
+.slider[data-active='true'] .indicator__liquid {
+  scale: calc(1.4 + (var(--delta, 0) * 0.05)) calc(1.4 - (var(--delta, 0) * 0.05));
+}
+
+.slider:active .wrapper,
+.slider[data-active='true'] .wrapper {
+  filter: blur(0px);
+}
+
+.slider:active .indicator__liquid .shadow,
+.slider[data-active='true'] .indicator__liquid .shadow {
+  opacity: 1;
+}
+
+.slider:active .indicator__liquid .cover,
+.slider[data-active='true'] .indicator__liquid .cover {
+  opacity: 0;
+}
+
+.slider:active .indicator__liquid .liquid__track,
+.slider[data-active='true'] .indicator__liquid .liquid__track {
+  left: 0;
+  height: calc((var(--height) * 0.25px));
+  min-height: calc((var(--height) * 0.25px));
+}
+
+/* ========== Bounce Animation ========== */
+[data-bounce='top'] svg:nth-of-type(2),
+[data-bounce='bottom'] svg:nth-of-type(1) {
+  animation: bounce 0.32s cubic-bezier(0.67, -0.45, 0.6, 1.29);
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    scale: 1;
+  }
+  50% {
+    animation-timing-function: cubic-bezier(0.64, 1.01, 0.7, 1.27);
+    scale: 1.25;
+  }
+}
+
+/* ========== Spring Easing on Active ========== */
+@media (hover: hover) {
+  :root[data-active='true'] .slider,
+  .slider[data-active='true'] {
+    --transition: 0.6s;
+    --ease: linear(
+      0 0%,
+      0.6091 3.69%,
+      1.0259 7.24%,
+      1.1733 9.05%,
+      1.283 10.92%,
+      1.3562 12.87%,
+      1.3948 14.95%,
+      1.4014 16.03%,
+      1.3999 17.16%,
+      1.3731 19.64%,
+      1.3202 22.27%,
+      1.1394 29.39%,
+      1.0582 33.17%,
+      0.9943 37.45%,
+      0.9734 39.64%,
+      0.9593 41.92%,
+      0.9505 45.08%,
+      0.9517 48.7%,
+      0.9924 63.02%,
+      1.0046 71.2%,
+      1.0061 78.24%,
+      1 100%
+    );
+  }
+}
+
+/* ========== Native Scroll-Driven Animation ========== */
+@supports (animation-timeline: scroll()) and (animation-range: 0 100%) {
+  .slider {
+    timeline-scope: --thumb;
+    animation: progress both linear, slider-liquid both linear;
+    animation-direction: reverse, reverse;
+    animation-timeline: --thumb, --thumb;
+    animation-range: contain, contain;
+  }
+
+  @keyframes progress {
+    to {
+      --slider-complete: 100;
+    }
+  }
+
+  @keyframes slider-liquid {
+    0% {
+      --slider-liquid: 0;
+    }
+    10%,
+    90% {
+      --slider-liquid: 60;
+    }
+    100% {
+      --slider-liquid: 100;
+    }
+  }
+
+  .slider input {
+    overflow: hidden;
+  }
+
+  .slider ::-webkit-slider-thumb {
+    view-timeline: --thumb inline;
+  }
+}

@@ -1,3 +1,4 @@
+@import url("https://rsms.me/inter/inter.css");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -100,7 +101,7 @@
   --text-h1: 40px;
   --text-display: 56px;
 
-  --font-sans: var(--font-geist-sans);
+  --font-sans: "InterVariable", "Inter", sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
 
@@ -147,4 +148,14 @@ body {
   html {
     @apply font-sans;
   }
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
 }

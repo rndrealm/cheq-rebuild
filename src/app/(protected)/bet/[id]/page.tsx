@@ -145,15 +145,36 @@ export default function BetDetailPage() {
             </span>
           )}
         </div>
-        <span
+        <div
           className={cn(
-            "flex h-6 items-center justify-center rounded-full px-3 text-xs font-semibold",
-            statusConfig.bg,
-            statusConfig.text,
+            "relative flex items-center justify-center overflow-clip rounded-full border-[0.5px] border-solid px-3 py-1",
+            statusConfig.border,
           )}
         >
-          {statusConfig.label}
-        </span>
+          <div
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b",
+              statusConfig.gradient,
+            )}
+          />
+          <span
+            className={cn(
+              "relative text-xs font-semibold leading-4",
+              statusConfig.text,
+              statusConfig.textShadow,
+            )}
+          >
+            {statusConfig.label}
+          </span>
+          <div
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-0 rounded-[inherit]",
+              statusConfig.insetShadow,
+            )}
+          />
+        </div>
       </div>
 
       {/* Bet Info */}

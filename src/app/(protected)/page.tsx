@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
-import { BetCard } from "@/components/bet-card";
+import { TokenCard } from "@/components/token-card";
 import { EmptyState } from "@/components/empty-state";
 import { useUser } from "@/components/providers/user-provider";
 import { useQuery } from "convex/react";
@@ -15,7 +15,7 @@ export default function Home() {
   const feed = useQuery(api.bets.feed);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 px-6 py-8">
+    <div className="flex flex-1 flex-col gap-6 px-6 py-8 bg-[#f6f6f6]">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-h2 font-bold text-fg-base">Feed</h1>
@@ -45,9 +45,9 @@ export default function Home() {
           <p className="text-caption text-fg-300">Loading...</p>
         </div>
       ) : feed.length > 0 ? (
-        <div className="grid grid-cols-[repeat(auto-fill,208px)] justify-center gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           {feed.map((bet) => (
-            <BetCard key={bet._id} bet={bet} />
+            <TokenCard key={bet._id} bet={bet} />
           ))}
         </div>
       ) : (
