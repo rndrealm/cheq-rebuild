@@ -80,7 +80,22 @@ const DIRECTION_OPTIONS_MAP: Record<string, DropdownSelectOption[]> = {
   ],
 };
 
-export function BetDialog({ onClose }: { onClose: () => void }) {
+export type BetDirection = "up" | "down" | null;
+
+const DIRECTION_SENTIMENT: Record<string, BetDirection> = {
+  Up: "up",
+  "Goes Over": "up",
+  Down: "down",
+  "Goes Under": "down",
+};
+
+export function BetDialog({
+  onClose,
+  onDirectionChange,
+}: {
+  onClose: () => void;
+  onDirectionChange?: (direction: BetDirection) => void;
+}) {
   const [betType, setBetType] = useState("Up/down");
   const [direction, setDirection] = useState("Up");
   const [amount, setAmount] = useState("");
@@ -92,6 +107,13 @@ export function BetDialog({ onClose }: { onClose: () => void }) {
   function handleBetTypeChange(value: string) {
     setBetType(value);
     setDirection(DIRECTION_OPTIONS_MAP[value]?.[0]?.value ?? "Up");
+    // Switching bet type resets the direction, which isn't a user choice.
+    onDirectionChange?.(null);
+  }
+
+  function handleDirectionChange(value: string) {
+    setDirection(value);
+    onDirectionChange?.(DIRECTION_SENTIMENT[value] ?? null);
   }
 
   return (
@@ -177,7 +199,7 @@ export function BetDialog({ onClose }: { onClose: () => void }) {
                   <DropdownSelect
                     value={direction}
                     options={directionOptions}
-                    onChange={setDirection}
+                    onChange={handleDirectionChange}
                   />
                 </div>
 

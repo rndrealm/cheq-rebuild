@@ -6,6 +6,7 @@ node_modules/
 .next/
 
 # env files
+.env
 .env.local
 
 # macOS
