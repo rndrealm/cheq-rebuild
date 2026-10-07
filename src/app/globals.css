@@ -104,6 +104,8 @@
   --font-sans: "InterVariable", "Inter", sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+  --font-display: var(--font-inter-display);
+  --font-geist: var(--font-geist-sans);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

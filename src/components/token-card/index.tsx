@@ -19,11 +19,17 @@ import { MorphChart, CHART_TOP, CHART_LEFT, CHART_W, CHART_H } from "./morph-cha
 import { ChartTooltip } from "./chart-tooltip";
 import { IntervalSelector } from "./interval-selector";
 import { CharSlide } from "./char-slide";
-import { BetDialog } from "./bet-dialog";
+import { BetDialog, type BetDirection } from "./bet-dialog";
 import { useTilt } from "@/hooks/use-tilt";
 import { useChartInteraction } from "@/hooks/use-chart-interaction";
 
-export function TokenCard({ bet }: { bet: FeedBet }) {
+export function TokenCard({
+  bet,
+  onDirectionChange,
+}: {
+  bet: FeedBet;
+  onDirectionChange?: (direction: BetDirection) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [activeInterval, setActiveInterval] = useState("1D");
   const [showBetDialog, setShowBetDialog] = useState(false);
@@ -309,7 +315,13 @@ export function TokenCard({ bet }: { bet: FeedBet }) {
 
         <AnimatePresence>
           {showBetDialog && (
-            <BetDialog onClose={() => setShowBetDialog(false)} />
+            <BetDialog
+              onClose={() => {
+                setShowBetDialog(false);
+                onDirectionChange?.(null);
+              }}
+              onDirectionChange={onDirectionChange}
+            />
           )}
         </AnimatePresence>
       </motion.div>
