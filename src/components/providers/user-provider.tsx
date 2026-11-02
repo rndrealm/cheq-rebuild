@@ -24,6 +24,11 @@ export function UserProvider({
   return <UserContext value={user}>{children}</UserContext>;
 }
 
+/** Like `useUser`, but returns null outside a UserProvider (e.g. public pages). */
+export function useOptionalUser(): UserContextValue | null {
+  return useContext(UserContext);
+}
+
 export function useUser(): UserContextValue {
   const user = useContext(UserContext);
   if (!user) {

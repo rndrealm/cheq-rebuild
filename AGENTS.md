@@ -26,6 +26,10 @@ Convex agent skills for common tasks can be installed by running
 
 Always use the `useConvexMutation` hook (`src/hooks/use-convex-mutation.ts`) instead of raw `useMutation` from `convex/react`. It provides `mutate`, `reset`, and derived state (`isPending`, `isSuccess`, `isError`, `data`, `error`).
 
+# Remote Images
+
+Always use the `RemoteImage` component (`src/components/ui/remote-image.tsx`) when displaying images from external URLs (e.g. token logos, user avatars). It handles loading shimmer states, fallback images, and uses `unoptimized` for remote sources. Never use raw `<img>` tags for external images.
+
 # Class Merging
 
 Always use the `cn()` utility (`src/lib/utils.ts`) when combining static and dynamic class names. Never use template literal interpolation for merging Tailwind classes.

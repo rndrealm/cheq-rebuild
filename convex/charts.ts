@@ -2,12 +2,11 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { fetchOHLCV, type OHLCVInterval } from "./lib/charts";
 
-const VALID_INTERVALS: OHLCVInterval[] = ["1h", "6h", "12h", "24h"];
+const VALID_INTERVALS: OHLCVInterval[] = ["1h", "4h", "1d"];
 
 export const getOHLCV = action({
   args: {
-    pairAddress: v.string(),
-    chain: v.string(),
+    symbol: v.string(),
     interval: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
@@ -15,6 +14,6 @@ export const getOHLCV = action({
       ? (args.interval as OHLCVInterval)
       : "1h";
 
-    return await fetchOHLCV(args.pairAddress, args.chain, interval);
+    return await fetchOHLCV(args.symbol, interval);
   },
 });

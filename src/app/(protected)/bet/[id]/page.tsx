@@ -2,53 +2,30 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
-import { GradientAvatar } from "@outpacelabs/avatars";
 import { ArrowLeft } from "lucide-react";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { useUser } from "@/components/providers/user-provider";
-import { useConvexMutation } from "@/hooks/use-convex-mutation";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, simpleHash } from "@/lib/utils";
 import {
   getStatusConfig,
   getBetDescription,
+  DURATION_LABELS,
   type BetStatus,
 } from "@/lib/helpers/bets";
+import { CreatorCard } from "@/components/bet-detail/creator-card";
+import { OpponentSection } from "@/components/bet-detail/opponent-section";
+import { BetActions } from "@/components/bet-detail/bet-actions";
+import { EXPRESSIONS, COLORS } from "@/lib/avatar-shapes";
 
-const DURATION_LABELS: Record<string, string> = {
-  "1h": "1 Hour",
-  "4h": "4 Hours",
-  "24h": "24 Hours",
-  "3d": "3 Days",
-  "1w": "1 Week",
-};
-
-function formatTimeLeft(ms: number): string {
-  if (ms <= 0) return "Expired";
-  const hours = Math.floor(ms / (1000 * 60 * 60));
-  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours >= 24) {
-    const days = Math.floor(hours / 24);
-    return `${days}d ${hours % 24}h left`;
-  }
-  if (hours > 0) return `${hours}h ${minutes}m left`;
-  return `${minutes}m left`;
-}
-
-function InfoRow({
-  label,
-  value,
-  valueClassName,
-}: {
-  label: string;
-  value: string;
-  valueClassName?: string;
-}) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm font-semibold text-fg-300">{label}</span>
-      <span className={cn("text-sm font-bold text-fg-base", valueClassName)}>
+      <span className="text-caption font-semibold text-fg-base leading-4">
+        {label}
+      </span>
+      <span className="text-caption font-semibold text-fg-base leading-4">
         {value}
       </span>
     </div>
@@ -62,19 +39,6 @@ export default function BetDetailPage() {
   const bet = useQuery(api.bets.detail, {
     betId: params.id as Id<"bets">,
   });
-
-  const { mutate: acceptBet, isPending: isAccepting } = useConvexMutation(
-    api.bets.accept,
-  );
-  const { mutate: declineBet, isPending: isDeclining } = useConvexMutation(
-    api.bets.decline,
-  );
-  const { mutate: cancelBet, isPending: isCancelling } = useConvexMutation(
-    api.bets.cancel,
-  );
-  const { mutate: rematchBet, isPending: isRematching } = useConvexMutation(
-    api.bets.rematch,
-  );
 
   if (bet === undefined) {
     return (
@@ -101,7 +65,8 @@ export default function BetDetailPage() {
     !isCreator &&
     (bet.status === "pending" || bet.status === "countered") &&
     (!bet.opponentId || isOpponent);
-  const canCancel = isCreator && (bet.status === "pending" || bet.status === "countered");
+  const canCancel =
+    isCreator && (bet.status === "pending" || bet.status === "countered");
   const canRematch =
     (isCreator || isOpponent) &&
     (bet.status === "resolved" || bet.status === "tied");
@@ -111,17 +76,14 @@ export default function BetDetailPage() {
       ? bet.winnerId === user._id
       : null;
 
-  const statusConfig = getStatusConfig(bet.status as BetStatus, isWinner);
-  const description = getBetDescription(bet as any);
+  // const statusConfig = getStatusConfig(bet.status as BetStatus, isWinner);
+  const statusConfig = getStatusConfig("tied" as BetStatus, isWinner);
+  const description = getBetDescription(bet);
   const rewardPool = bet.creatorWager + bet.opponentWager;
-  const now = Date.now();
-  const timeLeftMs =
-    bet.status === "active" ? bet.resolvesAt - now : bet.expiresAt - now;
 
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col gap-6 px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="hidden items-center  gap-3">
         <button
           type="button"
           onClick={() => router.back()}
@@ -132,132 +94,45 @@ export default function BetDetailPage() {
         <h1 className="text-h2 font-bold text-fg-base">Bet Details</h1>
       </div>
 
-      {/* Creator Card */}
-      <div className="flex flex-col items-center gap-3 rounded-[20px] border border-border bg-card px-4 py-6">
-        <GradientAvatar seed={bet.creator?.name ?? "Unknown"} size={48} />
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-sm font-bold text-fg-base">
-            {bet.creator?.name ?? "Unknown"}
-          </span>
-          {bet.creator?.username && (
-            <span className="text-xs font-semibold text-fg-300">
-              @{bet.creator.username}
-            </span>
-          )}
-        </div>
-        <div
-          className={cn(
-            "relative flex items-center justify-center overflow-clip rounded-full border-[0.5px] border-solid px-3 py-1",
-            statusConfig.border,
-          )}
-        >
-          <div
-            aria-hidden
-            className={cn(
-              "pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b",
-              statusConfig.gradient,
-            )}
-          />
-          <span
-            className={cn(
-              "relative text-xs font-semibold leading-4",
-              statusConfig.text,
-              statusConfig.textShadow,
-            )}
-          >
-            {statusConfig.label}
-          </span>
-          <div
-            aria-hidden
-            className={cn(
-              "pointer-events-none absolute inset-0 rounded-[inherit]",
-              statusConfig.insetShadow,
-            )}
-          />
-        </div>
-      </div>
+      <CreatorCard
+        name={bet.creator?.name ?? "Unknown"}
+        username={bet.creator?.username}
+        wager={bet.creatorWager}
+        statusConfig={statusConfig}
+        expressionIndex={simpleHash(bet.creatorId) % EXPRESSIONS.length}
+        colorIndex={simpleHash(bet.creatorId + "c") % COLORS.length}
+      />
 
-      {/* Bet Info */}
-      <div className="flex flex-col gap-3 rounded-[20px] border border-border bg-card p-4">
-        <p className="text-xs font-bold uppercase tracking-wider text-fg-300">
-          Position
+      <div className="flex flex-col gap-4 rounded-[20px] border border-border bg-card px-5.5 pb-9 pt-5.5">
+        <p className="text-caption font-semibold text-fg-base leading-4">
+          Positions
         </p>
-        <div className="flex items-center justify-between">
-          <span className="text-base font-bold text-fg-base">
-            {description.label}
-          </span>
-          <span className="text-base font-extrabold text-fg-base">
-            {description.value}
-          </span>
+        <div className="flex flex-col gap-3">
+          <InfoRow label={description.label} value={description.value} />
+          <InfoRow
+            label="Market Price"
+            value={`$${bet.priceAtCreation.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}
+          />
+          <InfoRow
+            label="Timeframe"
+            value={DURATION_LABELS[bet.duration] ?? bet.duration}
+          />
         </div>
-        <div className="border-t border-border" />
-        <InfoRow
-          label="Token"
-          value={`${bet.token.symbol} — $${bet.priceAtCreation.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}
-        />
-        {bet.tokenB && (
-          <InfoRow
-            label="vs Token"
-            value={`${bet.tokenB.symbol}${bet.priceAtCreationB ? ` — $${bet.priceAtCreationB.toLocaleString(undefined, { maximumFractionDigits: 6 })}` : ""}`}
-          />
-        )}
-        <InfoRow
-          label="Timeframe"
-          value={DURATION_LABELS[bet.duration] ?? bet.duration}
-        />
-        {(bet.status === "pending" ||
-          bet.status === "countered" ||
-          bet.status === "active") && (
-          <InfoRow
-            label={bet.status === "active" ? "Resolves in" : "Expires in"}
-            value={formatTimeLeft(timeLeftMs)}
-            valueClassName={
-              timeLeftMs < 60 * 60 * 1000 ? "text-warning" : undefined
-            }
-          />
-        )}
       </div>
 
-      {/* Wager Info */}
-      <div className="flex flex-col gap-3 rounded-[20px] border border-border bg-card p-4">
-        <p className="text-xs font-bold uppercase tracking-wider text-fg-300">
-          Stakes
+      <div className="flex flex-col gap-4 rounded-[20px] border border-border bg-card px-5.5 pb-9 pt-5.5">
+        <p className="text-caption font-semibold text-fg-base leading-4">
+          Stake Details
         </p>
-        <InfoRow label="Creator Wager" value={`${bet.creatorWager} pts`} />
-        <InfoRow label="Opponent Wager" value={`${bet.opponentWager} pts`} />
-        <div className="border-t border-dashed border-border" />
-        <InfoRow
-          label="Reward Pool"
-          value={`${rewardPool} pts`}
-          valueClassName="text-success"
-        />
+        <div className="flex flex-col gap-3">
+          <InfoRow label={description.label} value={description.value} />
+          <InfoRow label="Total Stake" value={`${bet.creatorWager} Points`} />
+          <InfoRow label="Reward Pool" value={`${rewardPool} Points`} />
+        </div>
       </div>
 
-      {/* Opponent Section */}
-      {bet.opponent ? (
-        <div className="flex items-center gap-3 rounded-[20px] border border-border bg-card px-4 py-4">
-          <GradientAvatar seed={bet.opponent.name} size={32} />
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-fg-base">
-              {bet.opponent.name}
-            </span>
-            <span className="text-xs font-semibold text-fg-300">
-              @{bet.opponent.username}
-            </span>
-          </div>
-          <span className="ml-auto text-xs font-semibold text-fg-400">
-            Opponent
-          </span>
-        </div>
-      ) : isCreator ? (
-        <div className="flex items-center justify-center rounded-[20px] border border-dashed border-border px-4 py-4">
-          <span className="text-sm font-semibold text-fg-300">
-            Waiting for an opponent...
-          </span>
-        </div>
-      ) : null}
+      <OpponentSection opponent={bet.opponent} isCreator={isCreator} />
 
-      {/* Winner Banner */}
       {bet.status === "resolved" && bet.winnerId && (
         <div
           className={cn(
@@ -280,64 +155,13 @@ export default function BetDetailPage() {
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex flex-col gap-2">
-        {canAccept && (
-          <Button
-            size="lg"
-            loading={isAccepting}
-            className="rounded-[10px]"
-            onClick={() =>
-              acceptBet({ betId: bet._id, userId: user._id })
-            }
-          >
-            Accept Challenge
-          </Button>
-        )}
-        {canAccept && (
-          <Button
-            variant="outline"
-            size="lg"
-            loading={isDeclining}
-            className="rounded-[10px]"
-            onClick={() =>
-              declineBet({ betId: bet._id, userId: user._id })
-            }
-          >
-            Decline
-          </Button>
-        )}
-        {canCancel && (
-          <Button
-            variant="destructive"
-            size="lg"
-            loading={isCancelling}
-            className="rounded-[10px]"
-            onClick={() =>
-              cancelBet({ betId: bet._id, userId: user._id })
-            }
-          >
-            Cancel Bet
-          </Button>
-        )}
-        {canRematch && (
-          <Button
-            variant="secondary"
-            size="lg"
-            loading={isRematching}
-            className="rounded-[10px]"
-            onClick={async () => {
-              const newBetId = await rematchBet({
-                betId: bet._id,
-                userId: user._id,
-              });
-              if (newBetId) router.push(`/bet/${newBetId}`);
-            }}
-          >
-            Rematch
-          </Button>
-        )}
-      </div>
+      <BetActions
+        betId={bet._id}
+        userId={user._id}
+        canAccept={canAccept}
+        canCancel={canCancel}
+        canRematch={canRematch}
+      />
     </div>
   );
 }

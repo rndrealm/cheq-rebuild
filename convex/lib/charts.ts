@@ -1,11 +1,4 @@
-const DEXSCREENER_TO_DEXPAPRIKA: Record<string, string> = {
-  zksyncera: "zksync",
-  hyperliquid: "hyperevm",
-};
-
-function mapChain(dexScreenerChain: string): string {
-  return DEXSCREENER_TO_DEXPAPRIKA[dexScreenerChain] ?? dexScreenerChain;
-}
+import { binanceApiUrl, toBinanceSymbol } from "./tokens";
 
 export type OHLCVCandle = {
   time: number;
@@ -16,28 +9,29 @@ export type OHLCVCandle = {
   volume: number;
 };
 
-export type OHLCVInterval = "1h" | "6h" | "12h" | "24h";
+export type OHLCVInterval = "1h" | "4h" | "1d";
 
 export async function fetchOHLCV(
-  pairAddress: string,
-  chain: string,
+  symbol: string,
   interval: OHLCVInterval = "1h",
+  limit = 100,
 ): Promise<OHLCVCandle[]> {
-  const network = mapChain(chain);
-  const url = `https://api.dexpaprika.com/networks/${network}/pools/${pairAddress}/ohlcv?start=-24h&interval=${interval}&limit=100`;
-
-  const res = await fetch(url);
+  const res = await fetch(
+    binanceApiUrl(
+      `/api/v3/klines?symbol=${toBinanceSymbol(symbol)}&interval=${interval}&limit=${limit}`,
+    ),
+  );
   if (!res.ok) return [];
 
   const data = await res.json();
   if (!Array.isArray(data)) return [];
 
-  return data.map((c: any) => ({
-    time: Math.floor(new Date(c.time_open).getTime() / 1000),
-    open: parseFloat(c.open) || 0,
-    high: parseFloat(c.high) || 0,
-    low: parseFloat(c.low) || 0,
-    close: parseFloat(c.close) || 0,
-    volume: parseFloat(c.volume) || 0,
+  return data.map((c: number[]) => ({
+    time: Math.floor(c[0] / 1000),
+    open: parseFloat(String(c[1])),
+    high: parseFloat(String(c[2])),
+    low: parseFloat(String(c[3])),
+    close: parseFloat(String(c[4])),
+    volume: parseFloat(String(c[5])),
   }));
 }

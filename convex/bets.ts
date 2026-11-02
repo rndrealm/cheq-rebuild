@@ -12,10 +12,7 @@ import {
 } from "./lib/constants";
 
 const tokenValidator = v.object({
-  address: v.string(),
   symbol: v.string(),
-  chain: v.string(),
-  pairAddress: v.string(),
 });
 
 const betTypeValidator = v.union(
@@ -68,7 +65,7 @@ export const detail = query({
         ? { name: creator.name, username: creator.username }
         : null,
       opponent: opponent
-        ? { name: opponent.name, username: opponent.username }
+        ? { id: opponent._id, name: opponent.name, username: opponent.username }
         : null,
     };
   },

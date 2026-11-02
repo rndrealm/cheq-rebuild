@@ -3,7 +3,6 @@ export const WEEKLY_TOPUP = 100;
 export const MIN_WAGER = 10;
 export const MAX_WAGER = 500;
 export const MAX_ACTIVE_BETS = 5;
-export const LIQUIDITY_THRESHOLD = 50_000;
 export const PRICE_CACHE_TTL = 60_000;
 export const MAX_COUNTER_ROUNDS = 3;
 export const CHALLENGE_EXPIRY_MS = 24 * 60 * 60 * 1000;

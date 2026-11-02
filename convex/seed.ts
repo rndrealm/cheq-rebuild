@@ -15,36 +15,11 @@ const FAKE_USERS = [
 ] as const;
 
 const TOKENS = {
-  SOL: {
-    address: "So11111111111111111111111111111111111111112",
-    symbol: "SOL",
-    chain: "solana",
-    pairAddress: "8sLbNZoA1cfnvMJLPfp98ZLAnFSYCFApfJKMbiXNLwxj",
-  },
-  ETH: {
-    address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    symbol: "ETH",
-    chain: "ethereum",
-    pairAddress: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
-  },
-  PEPE: {
-    address: "0x6982508145454ce325ddbe47a25d4ec3d2311933",
-    symbol: "PEPE",
-    chain: "ethereum",
-    pairAddress: "0xa43fe16908251ee70ef74718545e4fe6c5ccec9f",
-  },
-  DOGE: {
-    address: "0x4206931337dc273a630d328dA6441786BfaD668f",
-    symbol: "DOGE",
-    chain: "ethereum",
-    pairAddress: "0x9a315bdf513367c0377fb36886cfc33b46320058",
-  },
-  WIF: {
-    address: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
-    symbol: "WIF",
-    chain: "solana",
-    pairAddress: "EP2ib6dYdEeqD8MfE2ezHCxX3kP3K2eLKkirfPm5eyMx",
-  },
+  SOL: { symbol: "SOL" },
+  ETH: { symbol: "ETH" },
+  PEPE: { symbol: "PEPE" },
+  DOGE: { symbol: "DOGE" },
+  WIF: { symbol: "WIF" },
 } as const;
 
 export const seedBets = mutation({
@@ -142,7 +117,7 @@ export const seedBets = mutation({
       resolvesAt: now - 86400_000,
       resolvedAt: now - 86400_000,
       resolvedVia: "touch",
-      priceSource: "dexscreener",
+      priceSource: "binance",
       counterCount: 0,
       updatedAt: now - 86400_000,
     });

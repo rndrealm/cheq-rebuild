@@ -4,8 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
-import { GradientAvatar } from "@outpacelabs/avatars";
-import { cn } from "@/lib/utils";
+import { RemoteImage } from "@/components/ui/remote-image";
+import { Avatar } from "@/components/avatar";
+import { EXPRESSIONS, COLORS } from "@/lib/avatar-shapes";
+import { getTokenImage, getTokenName } from "@/lib/constants/tokens";
+import { cn, simpleHash } from "@/lib/utils";
 import { formatPrice } from "@/lib/helpers/format";
 import {
   getStatusConfig,
@@ -15,19 +18,30 @@ import {
 import { AppRoutes } from "@/lib/routes";
 import mainAssets from "@/lib/assets";
 import { GooFilter } from "./goo-filter";
-import { MorphChart, CHART_TOP, CHART_LEFT, CHART_W, CHART_H } from "./morph-chart";
+import {
+  MorphChart,
+  CHART_TOP,
+  CHART_LEFT,
+  CHART_W,
+  CHART_H,
+} from "./morph-chart";
 import { ChartTooltip } from "./chart-tooltip";
 import { IntervalSelector } from "./interval-selector";
 import { CharSlide } from "./char-slide";
 import { BetDialog, type BetDirection } from "./bet-dialog";
 import { useTilt } from "@/hooks/use-tilt";
 import { useChartInteraction } from "@/hooks/use-chart-interaction";
+import { useTokenChart } from "@/hooks/use-token-chart";
+
+export type TokenCardVariant = "default" | "hero";
 
 export function TokenCard({
   bet,
+  variant = "default",
   onDirectionChange,
 }: {
   bet: FeedBet;
+  variant?: TokenCardVariant;
   onDirectionChange?: (direction: BetDirection) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -35,6 +49,11 @@ export function TokenCard({
   const [showBetDialog, setShowBetDialog] = useState(false);
 
   const { elRef: tooltipRef, addVelocity } = useTilt();
+
+  const { data: chartDataMap, fetchInterval } = useTokenChart(
+    bet.token.symbol,
+  );
+  const currentChartData = chartDataMap[activeInterval] ?? null;
 
   const openBetDialog = useCallback(() => {
     setShowBetDialog(true);
@@ -47,22 +66,27 @@ export function TokenCard({
     handlePointerDown,
     handleMouseMove,
     handleMouseLeave,
-    handleIntervalChange: updateCrosshairForInterval,
     consumeDrag,
-  } = useChartInteraction(expanded, activeInterval, addVelocity, openBetDialog);
+  } = useChartInteraction(
+    expanded,
+    currentChartData,
+    addVelocity,
+    openBetDialog,
+  );
 
   const handleIntervalChange = useCallback(
     (interval: string) => {
       setActiveInterval(interval);
-      updateCrosshairForInterval(interval);
+      fetchInterval(interval);
     },
-    [updateCrosshairForInterval],
+    [fetchInterval],
   );
 
   const handleChartClick = useCallback(() => {
     if (consumeDrag()) return;
+    if (!expanded) fetchInterval(activeInterval);
     setExpanded((v) => !v);
-  }, [consumeDrag]);
+  }, [consumeDrag, expanded, fetchInterval, activeInterval]);
 
   const priceWrapperRef = useRef<HTMLDivElement>(null);
   const priceTextRef = useRef<HTMLSpanElement>(null);
@@ -77,11 +101,19 @@ export function TokenCard({
       const gap = wrapper.clientWidth - text.offsetWidth;
       wrapper.style.paddingLeft = `${Math.max(0, gap / 2)}px`;
     }
-    requestAnimationFrame(() => {
-      center(priceWrapperRef.current, priceTextRef.current);
-      center(changeWrapperRef.current, changeTextRef.current);
+    const pairs: [HTMLElement | null, HTMLElement | null][] = [
+      [priceWrapperRef.current, priceTextRef.current],
+      [changeWrapperRef.current, changeTextRef.current],
+    ];
+    const observer = new ResizeObserver(() => {
+      for (const [w, t] of pairs) center(w, t);
     });
-  }, [expanded, activeInterval]);
+    for (const [, t] of pairs) {
+      if (t) observer.observe(t);
+    }
+    for (const [w, t] of pairs) center(w, t);
+    return () => observer.disconnect();
+  }, [expanded, activeInterval, currentChartData]);
 
   const tooltipLeft = CHART_LEFT + crosshair.normX * CHART_W;
   const tooltipTop = CHART_TOP + crosshair.normY * CHART_H;
@@ -92,14 +124,20 @@ export function TokenCard({
   const description = getBetDescription(bet);
   const rewardPool = bet.creatorWager + bet.opponentWager;
 
+  const hasPrice = currentChartData !== null;
+  // const hasPrice = false; // DEBUG: force skeleton
+
   return (
     <div className="relative w-79.25">
       <GooFilter />
-      <motion.div className="relative h-100 w-full overflow-hidden rounded-[20px] border border-border bg-card" style={{ boxShadow: "0px 4px 20px 0px #00000014" }}>
+      <motion.div
+        className="relative h-100 w-full overflow-hidden rounded-[20px] border border-border bg-card"
+        style={{ boxShadow: "0px 4px 20px 0px #00000014" }}
+      >
         {/* Morph chart — always mounted for smooth animation */}
         <MorphChart
           expanded={expanded}
-          activeInterval={activeInterval}
+          chartPath={currentChartData?.path ?? null}
           crosshair={crosshair}
           isDragging={isDragging}
           onClick={handleChartClick}
@@ -123,7 +161,11 @@ export function TokenCard({
                 {/* Avatar + Name */}
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col gap-3">
-                    <GradientAvatar seed={creatorName} size={48} />
+                    <Avatar
+                      expressionIndex={simpleHash(bet.creatorId) % EXPRESSIONS.length}
+                      colorIndex={simpleHash(bet.creatorId + "c") % COLORS.length}
+                      size={48}
+                    />
                     <div className="flex flex-col gap-1">
                       <span className="text-sm font-semibold leading-5 text-fg-base">
                         {creatorName}
@@ -234,19 +276,18 @@ export function TokenCard({
                 <div className="flex items-center justify-between px-5.5 py-0.5">
                   <div className="flex-1" />
                   <span className="text-xs font-semibold text-fg-base">
-                    ETH (SOL)
+                    {bet.token.symbol} / USDT
                   </span>
                   <div className="flex flex-1 justify-end">
                     <div className="size-8" />
                   </div>
                 </div>
                 <div className="relative mx-auto mt-2 size-12">
-                  <Image
-                    src={mainAssets.baseImage}
-                    alt="BASE"
-                    width={48}
-                    height={48}
-                    className="rounded-full"
+                  <RemoteImage
+                    src={getTokenImage(bet.token.symbol)}
+                    alt={bet.token.symbol}
+                    size={48}
+                    fallback={mainAssets.baseImage}
                   />
                   <Image
                     src={mainAssets.usdImage}
@@ -268,32 +309,54 @@ export function TokenCard({
                 transition={{ duration: 0.2, delay: 0.16 }}
                 className="flex w-full flex-col gap-1 px-5.5 pt-3"
               >
-                <div
-                  ref={priceWrapperRef}
-                  className="transition-[padding] duration-150 ease-out"
-                >
-                  <span ref={priceTextRef} className="inline-block">
-                    <CharSlide
-                      text={formatPrice(crosshair.price)}
-                      className="whitespace-nowrap text-[32px] font-semibold leading-10 text-fg-base"
-                    />
-                  </span>
-                </div>
-                <div
-                  ref={changeWrapperRef}
-                  className="transition-[padding] duration-150 ease-out"
-                >
-                  <span ref={changeTextRef} className="inline-block">
-                    <CharSlide
-                      text={`${crosshair.change >= 0 ? "+" : ""}${crosshair.change.toFixed(2)}%`}
-                      className={cn(
-                        "whitespace-nowrap text-sm font-semibold leading-5",
-                        crosshair.change >= 0
-                          ? "text-[#47a95e]"
-                          : "text-destructive",
-                      )}
-                    />
-                  </span>
+                <div className="relative">
+                  <div
+                    className={cn(
+                      "absolute inset-0 flex flex-col items-center gap-2 transition-opacity duration-200",
+                      hasPrice ? "pointer-events-none opacity-0" : "opacity-100",
+                    )}
+                  >
+                    <div className="h-10 w-36 animate-pulse rounded-lg bg-fg-base/10" />
+                    <div className="h-5 w-20 animate-pulse rounded-md bg-fg-base/10" />
+                  </div>
+                  <div
+                    className={cn(
+                      "transition-opacity duration-200",
+                      hasPrice ? "opacity-100" : "opacity-0",
+                    )}
+                  >
+                    <div
+                      ref={priceWrapperRef}
+                      className="transition-[padding] duration-150 ease-out"
+                    >
+                      <span ref={priceTextRef} className="inline-block">
+                        <CharSlide
+                          text={hasPrice ? formatPrice(crosshair.price) : "$0.00"}
+                          className="whitespace-nowrap text-[32px] font-semibold leading-10 text-fg-base"
+                        />
+                      </span>
+                    </div>
+                    <div
+                      ref={changeWrapperRef}
+                      className="transition-[padding] duration-150 ease-out"
+                    >
+                      <span ref={changeTextRef} className="inline-block">
+                        <CharSlide
+                          text={
+                            hasPrice
+                              ? `${crosshair.change >= 0 ? "+" : ""}${crosshair.change.toFixed(2)}%`
+                              : "+0.00%"
+                          }
+                          className={cn(
+                            "whitespace-nowrap text-sm font-semibold leading-5",
+                            crosshair.change >= 0
+                              ? "text-[#47a95e]"
+                              : "text-destructive",
+                          )}
+                        />
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
 
@@ -316,9 +379,11 @@ export function TokenCard({
         <AnimatePresence>
           {showBetDialog && (
             <BetDialog
+              symbol={bet.token.symbol}
+              variant={variant}
               onClose={() => {
                 setShowBetDialog(false);
-                onDirectionChange?.(null);
+                onDirectionChange?.("up");
               }}
               onDirectionChange={onDirectionChange}
             />

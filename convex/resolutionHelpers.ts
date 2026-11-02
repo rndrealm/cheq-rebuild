@@ -73,7 +73,7 @@ export const settleSnapshot = internalMutation({
     betId: v.id("bets"),
     priceAtResolution: v.number(),
     priceAtResolutionB: v.optional(v.number()),
-    priceSource: v.union(v.literal("dexscreener"), v.literal("geckoterminal")),
+    priceSource: v.literal("binance"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -184,7 +184,7 @@ export const settleTouch = internalMutation({
   args: {
     betId: v.id("bets"),
     priceAtResolution: v.number(),
-    priceSource: v.union(v.literal("dexscreener"), v.literal("geckoterminal")),
+    priceSource: v.literal("binance"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

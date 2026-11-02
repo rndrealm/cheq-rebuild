@@ -44,7 +44,7 @@ describe("resolution", () => {
     await t.mutation(internal.resolutionHelpers.settleSnapshot, {
       betId,
       priceAtResolution: 1.5,
-      priceSource: "dexscreener",
+      priceSource: "binance",
     });
 
     const bet = await t.run(async (ctx) => ctx.db.get(betId));
@@ -93,7 +93,7 @@ describe("resolution", () => {
     await t.mutation(internal.resolutionHelpers.settleSnapshot, {
       betId,
       priceAtResolution: 0.5,
-      priceSource: "dexscreener",
+      priceSource: "binance",
     });
 
     const bet = await t.run(async (ctx) => ctx.db.get(betId));
@@ -142,7 +142,7 @@ describe("resolution", () => {
     await t.mutation(internal.resolutionHelpers.settleSnapshot, {
       betId,
       priceAtResolution: 1.0,
-      priceSource: "dexscreener",
+      priceSource: "binance",
     });
 
     const bet = await t.run(async (ctx) => ctx.db.get(betId));
@@ -196,7 +196,7 @@ describe("resolution", () => {
       betId,
       priceAtResolution: 1.5,
       priceAtResolutionB: 2.2,
-      priceSource: "dexscreener",
+      priceSource: "binance",
     });
 
     const bet = await t.run(async (ctx) => ctx.db.get(betId));
@@ -242,7 +242,7 @@ describe("resolution", () => {
     await t.mutation(internal.resolutionHelpers.settleTouch, {
       betId,
       priceAtResolution: 2.5,
-      priceSource: "dexscreener",
+      priceSource: "binance",
     });
 
     const bet = await t.run(async (ctx) => ctx.db.get(betId));
@@ -369,7 +369,7 @@ describe("resolution", () => {
     await t.mutation(internal.resolutionHelpers.settleSnapshot, {
       betId,
       priceAtResolution: 1.5,
-      priceSource: "dexscreener",
+      priceSource: "binance",
     });
 
     const rivalry = await t.run(async (ctx) => {
@@ -425,7 +425,7 @@ describe("resolution", () => {
     await t.mutation(internal.resolutionHelpers.settleSnapshot, {
       betId,
       priceAtResolution: 1.5,
-      priceSource: "dexscreener",
+      priceSource: "binance",
     });
 
     const alice = await t.run(async (ctx) => ctx.db.get(aliceId));

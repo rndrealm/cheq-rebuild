@@ -1,4 +1,4 @@
-const NUM_POINTS = 30;
+export const NUM_POINTS = 30;
 
 function seededRandom(seed: number) {
   let s = seed;
@@ -82,3 +82,18 @@ export const INTERVAL_PATHS: Record<string, string> = Object.fromEntries(
 
 export const BASE_PRICE = 1847.32;
 export const PRICE_RANGE = 400;
+
+export function resample(data: number[], targetLength: number): number[] {
+  if (data.length === 0) return new Array(targetLength).fill(0.5);
+  if (data.length === targetLength) return data;
+  const result: number[] = [];
+  for (let i = 0; i < targetLength; i++) {
+    const t = i / (targetLength - 1);
+    const srcIdx = t * (data.length - 1);
+    const lo = Math.floor(srcIdx);
+    const hi = Math.min(lo + 1, data.length - 1);
+    const frac = srcIdx - lo;
+    result.push(data[lo] + (data[hi] - data[lo]) * frac);
+  }
+  return result;
+}

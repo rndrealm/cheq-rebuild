@@ -10,10 +10,7 @@ export const MOCK_BET: FeedBet = {
   type: "up_down",
   status: "active",
   token: {
-    address: "0x0000",
-    symbol: "ETH",
-    chain: "sol",
-    pairAddress: "0x0000",
+    symbol: "SOL",
   },
   betTerms: { direction: "up" },
   creatorWager: 50,
