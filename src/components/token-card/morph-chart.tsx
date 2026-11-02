@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { TOGGLE_D, INTERVAL_PATHS } from "@/lib/helpers/chart";
+import { TOGGLE_D } from "@/lib/helpers/chart";
 import { LiquidThumb } from "./liquid-thumb";
 import type { CrosshairInfo } from "@/hooks/use-chart-interaction";
 
@@ -23,7 +23,7 @@ export { CHART_TOP, CHART_LEFT, CHART_W, CHART_H };
 
 type MorphChartProps = {
   expanded: boolean;
-  activeInterval: string;
+  chartPath: string | null;
   crosshair: CrosshairInfo;
   isDragging: boolean;
   onClick: () => void;
@@ -34,7 +34,7 @@ type MorphChartProps = {
 
 export function MorphChart({
   expanded,
-  activeInterval,
+  chartPath,
   crosshair,
   isDragging,
   onClick,
@@ -42,6 +42,11 @@ export function MorphChart({
   onMouseMove,
   onMouseLeave,
 }: MorphChartProps) {
+  const gradientId = useId();
+  const lastPathRef = useRef<string | null>(null);
+  if (chartPath !== null) lastPathRef.current = chartPath;
+  const displayPath = chartPath ?? lastPathRef.current ?? TOGGLE_D;
+
   const [showCrosshair, setShowCrosshair] = useState(false);
 
   useEffect(() => {
@@ -91,7 +96,7 @@ export function MorphChart({
       >
         <defs>
           <linearGradient
-            id="chart-reveal"
+            id={gradientId}
             x1="0"
             y1="0"
             x2="1"
@@ -110,9 +115,9 @@ export function MorphChart({
         </defs>
         <motion.path
           animate={{
-            d: expanded ? INTERVAL_PATHS[activeInterval] : TOGGLE_D,
+            d: expanded ? displayPath : TOGGLE_D,
           }}
-          stroke={expanded ? "url(#chart-reveal)" : "#A6A6A6"}
+          stroke={expanded ? `url(#${gradientId})` : "#A6A6A6"}
           transition={spring}
           strokeWidth={3}
           fill="none"

@@ -7,22 +7,87 @@ import { z } from "zod";
 import { useAction } from "convex/react";
 import { useUser } from "@/components/providers/user-provider";
 import { api } from "../../../../convex/_generated/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { FormField, FieldError } from "@/components/ui/form-field";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { BET_TYPES, DURATIONS } from "@/lib/constants/bets";
+import { AppRoutes } from "@/lib/routes";
+import { FieldError } from "@/components/ui/form-field";
+import { DurationPicker } from "@/components/duration-picker";
 import { TokenCombobox, type TokenValue } from "@/components/token-combobox";
+import {
+  DropdownSelect,
+  type DropdownSelectOption,
+} from "@/components/ui/dropdown-select";
+
+const ELLIPTIC_REVEAL_STYLES = `
+  @property --reveal {
+    syntax: '<percentage>';
+    inherits: true;
+    initial-value: 0%;
+  }
+  .elliptic-reveal {
+    --reveal: 0%;
+    mask-image: radial-gradient(
+      ellipse 100% 100% at 50% 100%,
+      black calc(var(--reveal) - 30%),
+      transparent var(--reveal)
+    );
+    -webkit-mask-image: radial-gradient(
+      ellipse 100% 100% at 50% 100%,
+      black calc(var(--reveal) - 30%),
+      transparent var(--reveal)
+    );
+    transition: --reveal 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .elliptic-reveal[data-revealed="true"] {
+    --reveal: 160%;
+  }
+`;
 
 const MIN_WAGER = 10;
 const MAX_WAGER = 500;
 
+// Lets the "Position Opened" reveal (0.7s) finish before navigating away.
+const REDIRECT_DELAY_MS = 1000;
+
+const BET_TYPE_OPTIONS: DropdownSelectOption[] = [
+  { label: "Up/Down", value: "up_down" },
+  { label: "Over/Under", value: "hit_price" },
+  { label: "Token vs Token", value: "token_vs_token" },
+];
+
+const DIRECTION_OPTIONS_MAP: Record<string, DropdownSelectOption[]> = {
+  up_down: [
+    {
+      label: "Goes Up",
+      value: "up",
+      icon: "/media/arrow-up.svg",
+      iconBg: "bg-[#f1fbf1]",
+    },
+    {
+      label: "Goes Down",
+      value: "down",
+      icon: "/media/arrow-down.svg",
+      iconBg: "bg-[#ffeaeb]",
+      iconRotation: "rotate-180",
+    },
+  ],
+  hit_price: [
+    {
+      label: "Goes Over",
+      value: "up",
+      icon: "/media/arrow-up.svg",
+      iconBg: "bg-[#f1fbf1]",
+    },
+    {
+      label: "Goes Under",
+      value: "down",
+      icon: "/media/arrow-down.svg",
+      iconBg: "bg-[#ffeaeb]",
+      iconRotation: "rotate-180",
+    },
+  ],
+};
+
 const tokenSchema = z.object({
-  address: z.string(),
   symbol: z.string(),
-  chain: z.string(),
-  pairAddress: z.string(),
 });
 
 const createBetSchema = z.object({
@@ -44,10 +109,13 @@ export default function CreateBetPage() {
   const router = useRouter();
   const createBet = useAction(api.betActions.createBet);
   const [isPending, setIsPending] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const form = useForm({
     defaultValues: {
-      token: null as TokenValue | null,
+      token: {
+        symbol: "BTC",
+      } as TokenValue | null,
       type: "up_down" as "up_down" | "hit_price" | "token_vs_token",
       direction: "up" as "up" | "down",
       targetPrice: 0,
@@ -90,7 +158,11 @@ export default function CreateBetPage() {
           wager: value.wager,
           duration: value.duration,
         });
-        router.push("/");
+        setIsSuccess(true);
+        setTimeout(
+          () => router.replace(AppRoutes.home.path),
+          REDIRECT_DELAY_MS,
+        );
       } finally {
         setIsPending(false);
       }
@@ -98,283 +170,297 @@ export default function CreateBetPage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-col gap-6 px-6 py-8">
-      <div>
-        <h1 className="text-h2 font-bold text-fg-base">New Position</h1>
-        <p className="text-caption text-fg-400">{user.points} pts available</p>
-      </div>
-
+    <div className="mx-auto flex min-h-dvh w-full max-w-79.25 items-center ">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           form.handleSubmit();
         }}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-4 rounded-[20px] bg-white px-7.5 pb-7 pt-5.5"
+        style={{
+          boxShadow: "0px 0px 0px 0.5px #0000000A, 0px 4px 24px 0px #0000000F",
+        }}
       >
-        {/* Token */}
-        <form.Field
-          name="token"
-          validators={{
-            onChange: ({ value }) => (!value ? "Select a token" : undefined),
-          }}
-        >
-          {(field) => (
-            <div className="flex flex-col gap-2">
-              <Label>Token or Memecoin</Label>
-              <TokenCombobox
-                value={field.state.value}
-                onSelect={(token) => field.handleChange(token)}
-                onBlur={field.handleBlur}
-                placeholder="Search token..."
-              />
-              <FieldError field={field} />
-            </div>
-          )}
-        </form.Field>
-
-        {/* Bet Type */}
-        <form.Field name="type">
-          {(field) => (
-            <div className="flex flex-col gap-2">
-              <Label>Bet Type</Label>
-              <div className="flex gap-2">
-                {BET_TYPES.map((bt) => (
-                  <button
-                    key={bt.value}
-                    type="button"
-                    onClick={() => field.handleChange(bt.value)}
-                    className={cn(
-                      "h-10 flex-1 rounded-[10px] border text-xs text-caption font-medium transition-colors",
-                      field.state.value === bt.value
-                        ? "border-fg-base bg-fg-base text-bg-base"
-                        : "border-border bg-bg-200 text-fg-400 hover:bg-bg-300",
-                    )}
-                  >
-                    {bt.label}
-                  </button>
-                ))}
+        <div className="flex flex-col">
+          {/* Token */}
+          <form.Field
+            name="token"
+            validators={{
+              onChange: ({ value }) => (!value ? "Select a token" : undefined),
+            }}
+          >
+            {(field) => (
+              <div className="pb-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-caption font-semibold text-fg-base">
+                    Token
+                  </span>
+                  <TokenCombobox
+                    value={field.state.value}
+                    onSelect={(token) => field.handleChange(token)}
+                    onBlur={field.handleBlur}
+                    placeholder="Select token"
+                    triggerClassName="h-auto w-32 rounded-[10px] border-0 bg-[#f3f3f3] h-9.5  px-2 text-xs"
+                  />
+                </div>
+                <FieldError field={field} />
               </div>
-            </div>
-          )}
-        </form.Field>
+            )}
+          </form.Field>
 
-        {/* Conditional Bet Terms */}
-        <form.Subscribe selector={(s) => s.values.type}>
-          {(type) => (
-            <>
-              {type === "up_down" && (
-                <form.Field name="direction">
-                  {(field) => (
-                    <div className="flex flex-col gap-2">
-                      <Label>Direction</Label>
-                      <div className="flex gap-2">
-                        {(["up", "down"] as const).map((dir) => (
-                          <button
-                            key={dir}
-                            type="button"
-                            onClick={() => field.handleChange(dir)}
-                            className={cn(
-                              "h-10 flex-1 rounded-[10px] border text-caption font-medium text-xs capitalize transition-colors",
-                              field.state.value === dir
-                                ? dir === "up"
-                                  ? "border-success bg-success-light text-fg-base"
-                                  : "border-destructive bg-destructive/10 text-destructive"
-                                : "border-border bg-bg-200 text-fg-400 hover:bg-bg-300",
-                            )}
-                          >
-                            {dir === "up" ? "Goes Up" : "Goes Down"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </form.Field>
-              )}
+          {/* Bet Type */}
+          <form.Field name="type">
+            {(field) => (
+              <div className="flex items-center justify-between pb-4">
+                <span className="text-caption font-semibold text-fg-base">
+                  Bet Type
+                </span>
+                <DropdownSelect
+                  value={field.state.value}
+                  options={BET_TYPE_OPTIONS}
+                  triggerClassName="text-caption w-32 h-9.5 rounded-[10px]"
+                  onChange={(v) =>
+                    field.handleChange(
+                      v as "up_down" | "hit_price" | "token_vs_token",
+                    )
+                  }
+                />
+              </div>
+            )}
+          </form.Field>
 
-              {type === "hit_price" && (
-                <form.Field name="targetPrice">
-                  {(field) => (
-                    <FormField
-                      field={field}
-                      label="Target Price"
-                      type="number"
-                      placeholder="e.g. 100"
-                      hint="Condition definitions can't be altered once bet is placed"
-                    />
-                  )}
-                </form.Field>
-              )}
-
-              {type === "token_vs_token" && (
-                <>
-                  <form.Field
-                    name="tokenB"
-                    validators={{
-                      onChange: ({ value }) =>
-                        !value ? "Select a second token" : undefined,
-                    }}
-                  >
+          {/* Conditional Bet Terms */}
+          <form.Subscribe selector={(s) => s.values.type}>
+            {(type) => (
+              <>
+                {(type === "up_down" || type === "hit_price") && (
+                  <form.Field name="direction">
                     {(field) => (
-                      <div className="flex flex-col gap-2">
-                        <Label>Second Token</Label>
-                        <TokenCombobox
+                      <div className="flex items-center justify-between pb-4">
+                        <span className="text-caption font-semibold text-fg-base">
+                          Direction
+                        </span>
+                        <DropdownSelect
                           value={field.state.value}
-                          onSelect={(token) => field.handleChange(token)}
-                          onBlur={field.handleBlur}
-                          placeholder="Search second token..."
+                          triggerClassName="text-caption w-32 h-9.5 rounded-[10px]"
+                          options={
+                            DIRECTION_OPTIONS_MAP[type] ??
+                            DIRECTION_OPTIONS_MAP["up_down"]
+                          }
+                          onChange={(v) =>
+                            field.handleChange(v as "up" | "down")
+                          }
                         />
+                      </div>
+                    )}
+                  </form.Field>
+                )}
+
+                {type === "hit_price" && (
+                  <form.Field name="targetPrice">
+                    {(field) => (
+                      <div className="pb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-fg-base">
+                            Target Price
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={field.state.value || ""}
+                            onChange={(e) =>
+                              field.handleChange(Number(e.target.value))
+                            }
+                            onBlur={field.handleBlur}
+                            placeholder="e.g. 100"
+                            className="w-32 rounded-[10px] bg-[#f3f3f3] h-9.5 pl-2.75 pr-2 text-xs font-medium text-[#111] outline-none placeholder:text-[#111]"
+                            style={{ boxShadow: "0px 0px 0px 1px #0000001C" }}
+                          />
+                        </div>
                         <FieldError field={field} />
                       </div>
                     )}
                   </form.Field>
+                )}
 
-                  <form.Field name="creatorSide">
-                    {(field) => (
-                      <div className="flex flex-col gap-2">
-                        <Label>Your Pick</Label>
-                        <div className="flex gap-2">
+                {type === "token_vs_token" && (
+                  <>
+                    <form.Field
+                      name="tokenB"
+                      validators={{
+                        onChange: ({ value }) =>
+                          !value ? "Select a second token" : undefined,
+                      }}
+                    >
+                      {(field) => (
+                        <div className="pb-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-fg-base">
+                              Second Token
+                            </span>
+                            <TokenCombobox
+                              value={field.state.value}
+                              onSelect={(token) => field.handleChange(token)}
+                              onBlur={field.handleBlur}
+                              placeholder="Select token"
+                              triggerClassName="h-auto w-32 rounded-[10px] border-0 bg-[#f3f3f3] h-9 pl-2.75 pr-2 text-xs"
+                            />
+                          </div>
+                          <FieldError field={field} />
+                        </div>
+                      )}
+                    </form.Field>
+
+                    <form.Field name="creatorSide">
+                      {(field) => (
+                        <div className="flex items-center justify-between pb-4">
+                          <span className="text-xs font-semibold text-fg-base">
+                            Your Pick
+                          </span>
                           <form.Subscribe
                             selector={(s) => [s.values.token, s.values.tokenB]}
                           >
-                            {([tokenA, tokenB]) =>
-                              (
-                                [
+                            {([tokenA, tokenB]) => (
+                              <DropdownSelect
+                                triggerClassName="text-caption w-32 h-9.5 rounded-[10px]"
+                                value={field.state.value}
+                                options={[
                                   {
-                                    value: "tokenA" as const,
                                     label:
                                       (tokenA as TokenValue | null)?.symbol ??
                                       "Token A",
+                                    value: "tokenA",
                                   },
                                   {
-                                    value: "tokenB" as const,
                                     label:
                                       (tokenB as TokenValue | null)?.symbol ??
                                       "Token B",
+                                    value: "tokenB",
                                   },
-                                ] as const
-                              ).map((side) => (
-                                <button
-                                  key={side.value}
-                                  type="button"
-                                  onClick={() => field.handleChange(side.value)}
-                                  className={cn(
-                                    "h-10 flex-1 rounded-[10px] border text-caption font-semibold uppercase transition-colors",
-                                    field.state.value === side.value
-                                      ? "border-fg-base bg-fg-base text-bg-base"
-                                      : "border-border bg-bg-200 text-fg-400 hover:bg-bg-300",
-                                  )}
-                                >
-                                  {side.label}
-                                </button>
-                              ))
-                            }
+                                ]}
+                                onChange={(v) =>
+                                  field.handleChange(v as "tokenA" | "tokenB")
+                                }
+                              />
+                            )}
                           </form.Subscribe>
                         </div>
-                      </div>
-                    )}
-                  </form.Field>
-                </>
-              )}
-            </>
-          )}
-        </form.Subscribe>
+                      )}
+                    </form.Field>
+                  </>
+                )}
+              </>
+            )}
+          </form.Subscribe>
 
-        {/* Duration */}
-        <form.Field name="duration">
-          {(field) => (
-            <div className="flex flex-col gap-2">
-              <Label>Timeframe</Label>
-              <div className="flex gap-2">
-                {DURATIONS.map((d) => (
-                  <button
-                    key={d.value}
-                    type="button"
-                    onClick={() => field.handleChange(d.value)}
-                    className={cn(
-                      "flex size-8 items-center justify-center rounded-md text-xs font-semibold transition-colors",
-                      field.state.value === d.value
-                        ? "bg-fg-base text-bg-base"
-                        : "bg-bg-200 text-fg-300 hover:bg-bg-300",
-                    )}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </form.Field>
-
-        {/* Wager */}
-        <form.Field name="wager">
-          {(field) => (
-            <FormField field={field} label="Stake Amount">
-              <div className="flex items-center gap-4">
-                <Input
-                  id="wager"
-                  type="number"
-                  min={MIN_WAGER}
-                  max={Math.min(MAX_WAGER, user.points)}
+          {/* Timeframe */}
+          <form.Field name="duration">
+            {(field) => (
+              <div className="flex items-center justify-between pb-4">
+                <span className="text-caption font-semibold text-fg-base">
+                  Timeframe
+                </span>
+                <DurationPicker
                   value={field.state.value}
-                  onChange={(e) => field.handleChange(Number(e.target.value))}
-                  onBlur={field.handleBlur}
-                  className="flex-1"
+                  onChange={field.handleChange}
                 />
-                <div className="flex gap-2">
-                  {[25, 50].map((pct) => (
-                    <button
-                      key={pct}
-                      type="button"
-                      onClick={() =>
-                        field.handleChange(
-                          Math.min(
-                            Math.floor((user.points * pct) / 100),
-                            MAX_WAGER,
-                          ),
-                        )
-                      }
-                      className="flex h-8 items-center justify-center rounded-md bg-bg-200 px-2 text-sm font-semibold text-fg-300 transition-colors hover:bg-bg-300"
-                    >
-                      {pct}%
-                    </button>
-                  ))}
-                </div>
               </div>
-            </FormField>
-          )}
-        </form.Field>
+            )}
+          </form.Field>
+
+          {/* Stake Amount */}
+          <form.Field name="wager">
+            {(field) => (
+              <div className="">
+                <div className="flex items-center justify-between">
+                  <span className="text-caption font-semibold text-fg-base">
+                    Stake Amount
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={MIN_WAGER}
+                    max={Math.min(MAX_WAGER, user.points)}
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(Number(e.target.value))}
+                    onBlur={field.handleBlur}
+                    placeholder="Enter amount"
+                    className="w-32 rounded-[10px] bg-[#f3f3f3] h-9.5 pl-2.75 pr-2 text-xs font-medium text-[#111] outline-none placeholder:text-[#111]"
+                    style={{ boxShadow: "0px 0px 0px 1px #0000001C" }}
+                  />
+                </div>
+                <FieldError field={field} />
+              </div>
+            )}
+          </form.Field>
+        </div>
 
         {/* Summary */}
         <form.Subscribe selector={(s) => s.values.wager}>
           {(wager) => (
-            <div className="flex flex-col gap-2 text-sm tracking-[-0.112px]">
+            <div className="flex flex-col gap-4 border-t  border-border pt-4 text-sm tracking-[-0.112px]">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-fg-base">Total Stake</span>
-                <span className="font-bold text-fg-base">{wager} pts</span>
+                <span className="font-semibold leading-4 text-caption text-fg-base">
+                  Total Stake
+                </span>
+                <span className="font-semibold leading-4 text-xs text-fg-base">
+                  {wager} Points
+                </span>
               </div>
-              <div className="border-t border-dashed border-border" />
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-fg-base">Reward Pool</span>
-                <span className="font-bold text-fg-base">{wager * 2} pts</span>
+                <span className="font-semibold leading-4 text-caption text-fg-base">
+                  Reward Pool
+                </span>
+                <span className="font-semibold leading-4 text-xs text-fg-base">
+                  {wager * 2} USD
+                </span>
               </div>
             </div>
           )}
         </form.Subscribe>
 
+        <p className="text-xs font-medium leading-4 text-hint">
+          The point system translates 1:1 with the USD, 1 point is equal to 1
+          USD
+        </p>
+
         {/* Submit */}
-        <form.Subscribe selector={(s) => s.canSubmit}>
-          {(canSubmit) => (
-            <Button
-              type="submit"
-              size="lg"
-              loading={isPending}
-              disabled={!canSubmit}
-              className="mt-2 rounded-[10px]"
+        <div className="relative">
+          <style>{ELLIPTIC_REVEAL_STYLES}</style>
+          <form.Subscribe selector={(s) => s.canSubmit}>
+            {(canSubmit) => (
+              <button
+                type="submit"
+                disabled={!canSubmit || isPending || isSuccess}
+                className="cursor-pointer flex h-12 w-full items-center justify-center rounded-full bg-[#0B0B0B] text-caption font-medium text-card hover:opacity-90 active:opacity-80 disabled:pointer-events-none disabled:opacity-50"
+                style={{
+                  boxShadow:
+                    "0px 2px 4px 0px #0B0B0B inset, 0px 2.5px 0px 0px #FFFFFFB2 inset",
+                }}
+              >
+                {isPending ? (
+                  <div className="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                ) : (
+                  "Open New Position"
+                )}
+              </button>
+            )}
+          </form.Subscribe>
+          <div
+            className="elliptic-reveal pointer-events-none absolute inset-0"
+            data-revealed={isSuccess}
+          >
+            <div
+              className="flex h-12 w-full items-center justify-center rounded-full bg-[#00DD48] text-caption font-medium text-white"
+              style={{
+                boxShadow:
+                  "0px 2px 0px 0px #00DD48 inset, 0px 3.5px 0px 0px #57F189 inset",
+              }}
             >
-              Open New Position
-            </Button>
-          )}
-        </form.Subscribe>
+              Position Opened
+            </div>
+          </div>
+        </div>
       </form>
     </div>
   );

@@ -14,10 +14,7 @@ export const resolveSnapshot = internalAction({
     });
     if (!bet || bet.status !== "active") return null;
 
-    const result = await fetchPriceWithRetry(
-      bet.token.pairAddress,
-      bet.token.chain,
-    );
+    const result = await fetchPriceWithRetry(bet.token.symbol);
 
     if (result.price === null) {
       await ctx.runMutation(internal.resolutionHelpers.flagBet, {
@@ -28,10 +25,7 @@ export const resolveSnapshot = internalAction({
 
     let priceAtResolutionB: number | undefined;
     if (bet.type === "token_vs_token" && bet.tokenB) {
-      const resultB = await fetchPriceWithRetry(
-        bet.tokenB.pairAddress,
-        bet.tokenB.chain,
-      );
+      const resultB = await fetchPriceWithRetry(bet.tokenB.symbol);
       if (resultB.price === null) {
         await ctx.runMutation(internal.resolutionHelpers.flagBet, {
           betId: args.betId,
@@ -83,7 +77,7 @@ export const pollTouchBets = internalAction({
     );
 
     for (const bet of activeTouchBets) {
-      const result = await fetchPrice(bet.token.pairAddress, bet.token.chain);
+      const result = await fetchPrice(bet.token.symbol);
       if (result.price === null) continue;
 
       const targetPrice = bet.betTerms.targetPrice;

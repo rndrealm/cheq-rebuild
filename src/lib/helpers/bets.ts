@@ -98,10 +98,7 @@ export function getStatusConfig(
 export type BetType = "up_down" | "hit_price" | "token_vs_token";
 
 export type Token = {
-  address: string;
   symbol: string;
-  chain: string;
-  pairAddress: string;
 };
 
 export type BetTerms = {
@@ -127,7 +124,9 @@ export type FeedBet = {
   opponent: { name: string; username: string } | null;
 };
 
-export function getBetDescription(bet: FeedBet): {
+export function getBetDescription(
+  bet: Pick<FeedBet, "type" | "token" | "tokenB" | "betTerms">,
+): {
   label: string;
   value: string;
 } {
@@ -151,4 +150,24 @@ export function getBetDescription(bet: FeedBet): {
             : (bet.tokenB?.symbol ?? ""),
       };
   }
+}
+
+export const DURATION_LABELS: Record<string, string> = {
+  "1h": "1 Hour",
+  "4h": "4 Hours",
+  "24h": "24 Hours",
+  "3d": "3 Days",
+  "1w": "1 Week",
+};
+
+export function formatTimeLeft(ms: number): string {
+  if (ms <= 0) return "Expired";
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h left`;
+  }
+  if (hours > 0) return `${hours}h ${minutes}m left`;
+  return `${minutes}m left`;
 }

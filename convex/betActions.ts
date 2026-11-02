@@ -7,10 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { fetchPrice } from "./lib/prices";
 
 const tokenValidator = v.object({
-  address: v.string(),
   symbol: v.string(),
-  chain: v.string(),
-  pairAddress: v.string(),
 });
 
 const betTypeValidator = v.union(
@@ -46,24 +43,30 @@ export const createBet = action({
   },
   returns: v.id("bets"),
   handler: async (ctx, args) => {
-    const priceResult = await fetchPrice(
-      args.token.pairAddress,
-      args.token.chain,
-    );
+    console.log(`[createBet] Fetching price for ${args.token.symbol}`);
+    const priceResult = await fetchPrice(args.token.symbol);
     if (priceResult.price === null) {
-      throw new Error("Could not fetch token price. Try again.");
+      throw new Error(
+        `Could not fetch price for ${args.token.symbol}. Check Convex logs for details.`,
+      );
     }
+    console.log(
+      `[createBet] ${args.token.symbol} price: ${priceResult.price}`,
+    );
 
     let priceAtCreationB: number | undefined;
     if (args.type === "token_vs_token" && args.tokenB) {
-      const priceBResult = await fetchPrice(
-        args.tokenB.pairAddress,
-        args.tokenB.chain,
-      );
+      console.log(`[createBet] Fetching price for ${args.tokenB.symbol}`);
+      const priceBResult = await fetchPrice(args.tokenB.symbol);
       if (priceBResult.price === null) {
-        throw new Error("Could not fetch second token price. Try again.");
+        throw new Error(
+          `Could not fetch price for ${args.tokenB.symbol}. Check Convex logs for details.`,
+        );
       }
       priceAtCreationB = priceBResult.price;
+      console.log(
+        `[createBet] ${args.tokenB.symbol} price: ${priceAtCreationB}`,
+      );
     }
 
     const betId: Id<"bets"> = await ctx.runMutation(internal.bets.create, {

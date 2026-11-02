@@ -32,7 +32,7 @@ export function DropdownSelect({
   value,
   options,
   onChange,
-  align = "end",
+  align = "start",
   sideOffset = 8,
   triggerClassName,
   contentClassName,

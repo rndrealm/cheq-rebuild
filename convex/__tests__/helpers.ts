@@ -6,17 +6,11 @@ import {
 } from "../lib/constants";
 
 export const TEST_TOKEN = {
-  address: "0xtoken1",
   symbol: "PEPE",
-  chain: "ethereum",
-  pairAddress: "0xpair1",
 };
 
 export const TEST_TOKEN_B = {
-  address: "0xtoken2",
   symbol: "DOGE",
-  chain: "ethereum",
-  pairAddress: "0xpair2",
 };
 
 export function makeUser(

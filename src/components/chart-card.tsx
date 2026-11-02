@@ -14,7 +14,8 @@ import {
   type Candle,
 } from "@/lib/helpers/mock-chart";
 import { ChartToggleIcon } from "@/components/chart-toggle-icon";
-import { GradientAvatar } from "@outpacelabs/avatars";
+import { RemoteImage } from "@/components/ui/remote-image";
+import { getTokenImage, getTokenName } from "@/lib/constants/tokens";
 import {
   createChart,
   ColorType,
@@ -61,8 +62,7 @@ export function ChartCard({ token, onToggle, toggleLayoutId }: ChartCardProps) {
 
       try {
         const price = await getPrice({
-          pairAddress: token.pairAddress,
-          chain: token.chain,
+          symbol: token.symbol,
         });
 
         if (cancelled) return;
@@ -123,7 +123,7 @@ export function ChartCard({ token, onToggle, toggleLayoutId }: ChartCardProps) {
         const candles = generateMockCandles(
           basePriceRef.current,
           "1D",
-          token.symbol + token.chain,
+          token.symbol,
         );
         prevCandlesRef.current = candles;
         areaSeries.setData(
@@ -251,7 +251,7 @@ export function ChartCard({ token, onToggle, toggleLayoutId }: ChartCardProps) {
       }
       seriesRef.current = null;
     };
-  }, [token.pairAddress, token.chain, token.symbol, getPrice]);
+  }, [token.symbol, getPrice]);
 
   useEffect(() => {
     if (!seriesRef.current || !chartRef.current) return;
@@ -264,7 +264,7 @@ export function ChartCard({ token, onToggle, toggleLayoutId }: ChartCardProps) {
     const newCandles = generateMockCandles(
       basePriceRef.current,
       activeInterval,
-      token.symbol + token.chain,
+      token.symbol,
     );
 
     const startTime = performance.now();
@@ -296,7 +296,7 @@ export function ChartCard({ token, onToggle, toggleLayoutId }: ChartCardProps) {
     animFrameRef.current = requestAnimationFrame(tick);
 
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [activeInterval, token.symbol, token.chain]);
+  }, [activeInterval, token.symbol]);
 
   const isPositive = priceData && priceData.priceChange24h >= 0;
   const changeColor = isPositive ? "text-[#47a95e]" : "text-destructive";
@@ -307,7 +307,7 @@ export function ChartCard({ token, onToggle, toggleLayoutId }: ChartCardProps) {
       <div className="flex items-center justify-between px-5.5 py-0.5">
         <div className="flex-1" />
         <span className="text-xs font-semibold text-fg-base">
-          {token.symbol} ({token.chain.toUpperCase()})
+          {token.symbol} / USDT
         </span>
         <div className="flex flex-1 justify-end">
           <ChartToggleIcon
@@ -320,10 +320,12 @@ export function ChartCard({ token, onToggle, toggleLayoutId }: ChartCardProps) {
 
       {/* Token Icon */}
       <div className="relative mx-auto mt-2 size-12">
-        <GradientAvatar seed={token.symbol} size={48} />
-        <span className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-lg border-2 border-white bg-[#47a95e] text-[10px] font-bold leading-none text-white">
-          {token.chain.slice(0, 2).toUpperCase()}
-        </span>
+        <RemoteImage
+          src={getTokenImage(token.symbol)}
+          alt={token.symbol}
+          size={48}
+          fallback="/media/token-placeholder.svg"
+        />
       </div>
 
       {/* Chart — fixed height to prevent layout shift */}

@@ -37,6 +37,7 @@
   --info: #425eb9;
   --info-light: #b0ccff;
 
+  --hint: #8C8C8C;
   --icon: #5f6368;
 
   --background: #ffffff;
@@ -92,6 +93,7 @@
   --color-info: var(--info);
   --color-info-light: var(--info-light);
 
+  --color-hint: var(--hint);
   --color-icon: var(--icon);
 
   --text-footnote: 11px;
@@ -106,6 +108,9 @@
   --font-heading: var(--font-sans);
   --font-display: var(--font-inter-display);
   --font-geist: var(--font-geist-sans);
+  --font-monument: var(--font-monument-grotesk);
+  --font-monument-mono: var(--font-monument-grotesk-mono);
+  --font-monument-semi-mono: var(--font-monument-grotesk-semi-mono);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -134,6 +139,47 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Landing page palette. Scoped to the page's .landing wrapper (not :root), so its
+   dark mode leaves the rest of the app alone. .dark is set on that wrapper by the
+   page's inline theme script and the header toggle. */
+.landing {
+  --landing-bg: #ffffff;
+  --landing-heading: #161616;
+  --landing-surface: #fafafa;
+  --landing-surface-ring: #00000014;
+  --landing-placeholder: #f5f5f5;
+  --landing-muted: #646464;
+  --landing-cta: #0b0b0b;
+  --landing-cta-fg: #ffffff;
+  --landing-pull-bar: #eeedec;
+  --landing-cutout: #f6f5f3;
+  --landing-ticket-face: #ffffff;
+  --ink-faint: #d6d3ce;
+  --ink-body: #68655f;
+  --ink-strong: #000000;
+}
+
+/* Warm near-blacks, matching the warm greys of the light palette */
+.landing.dark {
+  color-scheme: dark;
+  --landing-bg: #121110;
+  --landing-heading: #f2f0ec;
+  --landing-surface: #1b1a18;
+  --landing-surface-ring: #ffffff14;
+  --landing-placeholder: #262422;
+  --landing-muted: #a3a09a;
+  --landing-cta: #f5f4f0;
+  --landing-cta-fg: #0b0b0b;
+  --landing-pull-bar: #4a4743;
+  --landing-cutout: #1b1a18;
+  --landing-ticket-face: #000000;
+  /* LandingAvatarIcon's frame and eyes (black outside dark mode) */
+  --landing-avatar-fg: #ffffff;
+  --ink-faint: #34322f;
+  --ink-body: #a3a09a;
+  --ink-strong: #f5f4f0;
+}
+
 body {
   background: var(--bg-base);
   color: var(--text-base);
@@ -160,4 +206,23 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* DEMO: combobox search loading bar — remove before launch */
+@keyframes slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
 }

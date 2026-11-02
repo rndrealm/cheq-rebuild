@@ -46,17 +46,11 @@ export default defineSchema({
       v.literal("flagged"),
     ),
     token: v.object({
-      address: v.string(),
       symbol: v.string(),
-      chain: v.string(),
-      pairAddress: v.string(),
     }),
     tokenB: v.optional(
       v.object({
-        address: v.string(),
         symbol: v.string(),
-        chain: v.string(),
-        pairAddress: v.string(),
       }),
     ),
     betTerms: v.object({
@@ -90,9 +84,7 @@ export default defineSchema({
         v.literal("manual"),
       ),
     ),
-    priceSource: v.optional(
-      v.union(v.literal("dexscreener"), v.literal("geckoterminal")),
-    ),
+    priceSource: v.optional(v.literal("binance")),
     counterCount: v.number(),
     updatedAt: v.number(),
   })
@@ -168,4 +160,15 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_userId_read", ["userId", "read"]),
+
+  chartCache: defineTable({
+    symbol: v.string(),
+    interval: v.string(),
+    closes: v.array(v.number()),
+    basePrice: v.number(),
+    latestPrice: v.number(),
+    minPrice: v.number(),
+    maxPrice: v.number(),
+    fetchedAt: v.number(),
+  }).index("by_symbol_and_interval", ["symbol", "interval"]),
 });
