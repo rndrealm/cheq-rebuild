@@ -7,6 +7,17 @@ export const PRICE_CACHE_TTL = 60_000;
 export const MAX_COUNTER_ROUNDS = 3;
 export const CHALLENGE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
+// The tokens users can bet on, in both dev (binance.com) and prod (binance.us).
+// Each must have a <SYMBOL>USDT pair on Binance.US with enough volume for a
+// stable price (roughly $5k+/day; checked Nov 2026). Thin markets can sit
+// unchanged for hours or be moved by one small trade, which breaks settlement.
+// Shared with the frontend token picker, so keep this file free of server imports.
+export const SUPPORTED_TOKENS = [
+  "BTC", "ETH", "BNB", "SOL", "XRP", "DOGE", "ADA", "AVAX",
+  "LINK", "SHIB", "SUI", "DOT", "XLM", "HBAR", "UNI", "LTC",
+  "NEAR", "PEPE", "RENDER", "FET", "AAVE", "ARB", "INJ", "POL",
+] as const;
+
 export const DEFAULT_MU = 25;
 export const DEFAULT_SIGMA = 25 / 3;
 export const DEFAULT_DISPLAY_RATING = DEFAULT_MU - 3 * DEFAULT_SIGMA;

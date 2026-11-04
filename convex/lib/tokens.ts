@@ -1,14 +1,7 @@
 import { env } from "../_generated/server";
+import { SUPPORTED_TOKENS } from "./constants";
 
-export const SUPPORTED_SYMBOLS = new Set([
-  "BTC", "ETH", "BNB", "SOL", "XRP", "DOGE", "ADA", "TRX",
-  "AVAX", "LINK", "TON", "SHIB", "SUI", "DOT", "XLM", "BCH",
-  "HBAR", "UNI", "LTC", "NEAR", "APT", "ICP", "PEPE", "ETC",
-  "RENDER", "FET", "AAVE", "STX", "IMX", "FIL", "ARB", "OP",
-  "MKR", "INJ", "ATOM", "VET", "GRT", "ALGO", "FTM", "SEI",
-  "RUNE", "FLOW", "MANA", "ENS", "SAND", "AXS", "GALA", "CRV",
-  "WIF", "POL",
-]);
+export const SUPPORTED_SYMBOLS: ReadonlySet<string> = new Set(SUPPORTED_TOKENS);
 
 export function toBinanceSymbol(symbol: string): string {
   return `${symbol}USDT`;

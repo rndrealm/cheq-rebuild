@@ -8,6 +8,9 @@ export const AppRoutes = {
   home: {
     path: "/",
   },
+  feed: {
+    path: "/feed",
+  },
   createBet: {
     path: "/create-bet",
   },

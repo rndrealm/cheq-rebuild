@@ -1,7 +1,9 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, internalMutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { authedMutation, optionalAuthQuery } from "./lib/functions";
+import { isTargetHit } from "./lib/touch";
 import {
   MIN_WAGER,
   MAX_WAGER,
@@ -133,6 +135,54 @@ export const feedForUser = query({
   },
 });
 
+// The caller's live bets (either side), soonest to resolve first, each with
+// the other player's profile. Powers the dashboard's main widget. Returns []
+// when logged out so the live query doesn't throw during sign-out.
+export const myActive = optionalAuthQuery({
+  args: {},
+  handler: async (ctx) => {
+    if (!ctx.user) return [];
+    const userId = ctx.user._id;
+
+    // Active bets are capped by MAX_ACTIVE_BETS; take a little more as headroom
+    // for bets accepted before the cap existed.
+    const limit = MAX_ACTIVE_BETS * 2;
+    const [asCreator, asOpponent] = await Promise.all([
+      ctx.db
+        .query("bets")
+        .withIndex("by_creatorId_status", (q) =>
+          q.eq("creatorId", userId).eq("status", "active"),
+        )
+        .take(limit),
+      ctx.db
+        .query("bets")
+        .withIndex("by_opponentId_status", (q) =>
+          q.eq("opponentId", userId).eq("status", "active"),
+        )
+        .take(limit),
+    ]);
+
+    const bets = [...asCreator, ...asOpponent].sort(
+      (a, b) => a.resolvesAt - b.resolvesAt,
+    );
+
+    return await Promise.all(
+      bets.map(async (bet) => {
+        const isCreator = bet.creatorId === userId;
+        const rivalId = isCreator ? bet.opponentId : bet.creatorId;
+        const rival = rivalId ? await ctx.db.get(rivalId) : null;
+        return {
+          ...bet,
+          isCreator,
+          rival: rival
+            ? { id: rival._id, name: rival.name, username: rival.username }
+            : null,
+        };
+      }),
+    );
+  },
+});
+
 export const listByUser = query({
   args: {
     userId: v.id("users"),
@@ -167,6 +217,8 @@ export const listByUser = query({
   },
 });
 
+// Internal: called by `betActions.createBet`, which resolves `creatorId` from
+// the session.
 export const create = internalMutation({
   args: {
     creatorId: v.id("users"),
@@ -196,21 +248,15 @@ export const create = internalMutation({
     if (!creator) throw new Error("Creator not found");
     if (creator.points < args.wager) throw new Error("Insufficient points");
 
-    const activeBets = await ctx.db
-      .query("bets")
-      .withIndex("by_creatorId_status", (q) =>
-        q.eq("creatorId", args.creatorId).eq("status", "active"),
-      )
-      .collect();
-    const pendingBets = await ctx.db
-      .query("bets")
-      .withIndex("by_creatorId_status", (q) =>
-        q.eq("creatorId", args.creatorId).eq("status", "pending"),
-      )
-      .collect();
-    if (activeBets.length + pendingBets.length >= MAX_ACTIVE_BETS) {
-      throw new Error(`Maximum ${MAX_ACTIVE_BETS} active bets allowed`);
+    if (args.opponentId) {
+      if (args.opponentId === args.creatorId) {
+        throw new Error("Cannot challenge yourself");
+      }
+      const opponent = await ctx.db.get(args.opponentId);
+      if (!opponent) throw new Error("Opponent not found");
     }
+
+    await assertUnderBetLimit(ctx, args.creatorId);
 
     if (args.type === "token_vs_token" && !args.tokenB) {
       throw new Error("Token vs token bets require a second token");
@@ -271,46 +317,63 @@ export const create = internalMutation({
   },
 });
 
-export const accept = mutation({
+// Internal: called by `betActions.acceptBet`, which resolves `userId` from the
+// session and fetches the start price. The bet starts now: the start price and
+// a fresh `resolvesAt` (now + duration) are set here.
+export const accept = internalMutation({
   args: {
     betId: v.id("bets"),
     userId: v.id("users"),
+    priceAtStart: v.number(),
+    priceAtStartB: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new Error("User not found");
     const bet = await ctx.db.get(args.betId);
     if (!bet) throw new Error("Bet not found");
     if (bet.status !== "pending" && bet.status !== "countered") {
       throw new Error("Bet is not available for acceptance");
     }
-    if (bet.opponentId && bet.opponentId !== args.userId) {
+    if (bet.opponentId && bet.opponentId !== user._id) {
       throw new Error("This challenge is not for you");
     }
-    if (bet.creatorId === args.userId) {
+    if (bet.creatorId === user._id) {
       throw new Error("Cannot accept your own bet");
     }
 
     const now = Date.now();
     if (now > bet.expiresAt) throw new Error("Challenge has expired");
 
-    const user = await ctx.db.get(args.userId);
-    if (!user) throw new Error("User not found");
     if (user.points < bet.opponentWager) throw new Error("Insufficient points");
+    await assertUnderBetLimit(ctx, user._id);
 
-    await ctx.db.patch(args.userId, {
+    // An Over/under bet whose target is already reached would be decided
+    // before it starts.
+    if (bet.type === "hit_price" && isTargetHit(bet.betTerms, args.priceAtStart)) {
+      throw new Error("Target price already reached");
+    }
+
+    await ctx.db.patch(user._id, {
       points: user.points - bet.opponentWager,
     });
 
     await ctx.db.insert("pointTransactions", {
-      userId: args.userId,
+      userId: user._id,
       amount: -bet.opponentWager,
       type: "bet_lock",
       betId: args.betId,
     });
 
+    const resolvesAt = now + DURATION_MS[bet.duration];
     await ctx.db.patch(args.betId, {
       status: "active",
-      opponentId: args.userId,
+      opponentId: user._id,
+      priceAtStart: args.priceAtStart,
+      priceAtStartB: args.priceAtStartB,
+      startedAt: now,
+      resolvesAt,
       updatedAt: now,
     });
 
@@ -323,22 +386,23 @@ export const accept = mutation({
       read: false,
     });
 
-    if (bet.type !== "hit_price") {
-      await ctx.scheduler.runAt(
-        bet.resolvesAt,
-        internal.resolution.resolveSnapshot,
-        { betId: args.betId },
-      );
-    }
+    // hit_price bets are also settled early by the touch poller; at the
+    // deadline, an untouched one goes to the opponent.
+    await ctx.scheduler.runAt(
+      resolvesAt,
+      bet.type === "hit_price"
+        ? internal.resolutionHelpers.settleTouchDeadline
+        : internal.resolution.resolveSnapshot,
+      { betId: args.betId },
+    );
 
     return null;
   },
 });
 
-export const decline = mutation({
+export const decline = authedMutation({
   args: {
     betId: v.id("bets"),
-    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -347,7 +411,9 @@ export const decline = mutation({
     if (bet.status !== "pending" && bet.status !== "countered") {
       throw new Error("Bet cannot be declined");
     }
-    if (bet.opponentId && bet.opponentId !== args.userId) {
+    // Only a named opponent can decline. Open challenges have no one to
+    // decline them; the creator uses `cancel`.
+    if (!bet.opponentId || bet.opponentId !== ctx.user._id) {
       throw new Error("This challenge is not for you");
     }
 
@@ -383,10 +449,9 @@ export const decline = mutation({
   },
 });
 
-export const counter = mutation({
+export const counter = authedMutation({
   args: {
     betId: v.id("bets"),
-    userId: v.id("users"),
     newWager: v.number(),
   },
   returns: v.null(),
@@ -406,8 +471,8 @@ export const counter = mutation({
     const now = Date.now();
     if (now > bet.expiresAt) throw new Error("Challenge has expired");
 
-    const isCreator = bet.creatorId === args.userId;
-    const isOpponent = bet.opponentId === args.userId;
+    const isCreator = bet.creatorId === ctx.user._id;
+    const isOpponent = bet.opponentId === ctx.user._id;
     if (!isCreator && !isOpponent) {
       throw new Error("You are not part of this bet");
     }
@@ -415,8 +480,7 @@ export const counter = mutation({
     const notifyUserId = isCreator ? bet.opponentId : bet.creatorId;
 
     if (isCreator) {
-      const creator = await ctx.db.get(bet.creatorId);
-      if (!creator) throw new Error("Creator not found");
+      const creator = ctx.user;
       const diff = args.newWager - bet.creatorWager;
       if (diff > 0 && creator.points < diff) {
         throw new Error("Insufficient points for higher wager");
@@ -457,24 +521,22 @@ export const counter = mutation({
   },
 });
 
-export const cancel = mutation({
+export const cancel = authedMutation({
   args: {
     betId: v.id("bets"),
-    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const bet = await ctx.db.get(args.betId);
     if (!bet) throw new Error("Bet not found");
-    if (bet.creatorId !== args.userId) {
+    if (bet.creatorId !== ctx.user._id) {
       throw new Error("Only the creator can cancel a bet");
     }
     if (bet.status !== "pending" && bet.status !== "countered") {
       throw new Error("Only pending bets can be cancelled");
     }
 
-    const creator = await ctx.db.get(bet.creatorId);
-    if (!creator) throw new Error("Creator not found");
+    const creator = ctx.user;
 
     await ctx.db.patch(bet.creatorId, {
       points: creator.points + bet.creatorWager,
@@ -496,21 +558,21 @@ export const cancel = mutation({
   },
 });
 
-export const rematch = mutation({
+export const rematch = authedMutation({
   args: {
     betId: v.id("bets"),
-    userId: v.id("users"),
   },
   returns: v.id("bets"),
   handler: async (ctx, args) => {
+    const userId = ctx.user._id;
     const original = await ctx.db.get(args.betId);
     if (!original) throw new Error("Bet not found");
     if (original.status !== "resolved" && original.status !== "tied") {
       throw new Error("Can only rematch resolved bets");
     }
 
-    const isCreator = original.creatorId === args.userId;
-    const isOpponent = original.opponentId === args.userId;
+    const isCreator = original.creatorId === userId;
+    const isOpponent = original.opponentId === userId;
     if (!isCreator && !isOpponent) {
       throw new Error("You are not part of this bet");
     }
@@ -520,42 +582,27 @@ export const rematch = mutation({
       : original.creatorId;
     const wager = original.creatorWager;
 
-    const creator = await ctx.db.get(args.userId);
-    if (!creator) throw new Error("User not found");
+    const creator = ctx.user;
     if (creator.points < wager) throw new Error("Insufficient points");
 
-    const activeBets = await ctx.db
-      .query("bets")
-      .withIndex("by_creatorId_status", (q) =>
-        q.eq("creatorId", args.userId).eq("status", "active"),
-      )
-      .collect();
-    const pendingBets = await ctx.db
-      .query("bets")
-      .withIndex("by_creatorId_status", (q) =>
-        q.eq("creatorId", args.userId).eq("status", "pending"),
-      )
-      .collect();
-    if (activeBets.length + pendingBets.length >= MAX_ACTIVE_BETS) {
-      throw new Error(`Maximum ${MAX_ACTIVE_BETS} active bets allowed`);
-    }
+    await assertUnderBetLimit(ctx, userId);
 
     const now = Date.now();
     const durationMs = DURATION_MS[original.duration];
     const resolvesAt = now + durationMs;
     const expiresAt = Math.min(now + CHALLENGE_EXPIRY_MS, resolvesAt);
 
-    await ctx.db.patch(args.userId, {
+    await ctx.db.patch(userId, {
       points: creator.points - wager,
     });
     await ctx.db.insert("pointTransactions", {
-      userId: args.userId,
+      userId,
       amount: -wager,
       type: "bet_lock",
     });
 
     const betId = await ctx.db.insert("bets", {
-      creatorId: args.userId,
+      creatorId: userId,
       opponentId: opponentId,
       type: original.type,
       status: "pending",
@@ -593,3 +640,30 @@ export const rematch = mutation({
     return betId;
   },
 });
+
+// Counts every bet the user has points locked in: challenges they created that
+// are still open (pending / countered) and active bets on either side.
+// Incoming challenges they haven't accepted don't count, so others can't fill
+// someone's slots by challenging them.
+async function assertUnderBetLimit(ctx: QueryCtx, userId: Id<"users">) {
+  const counts = await Promise.all([
+    ...(["pending", "countered", "active"] as const).map((status) =>
+      ctx.db
+        .query("bets")
+        .withIndex("by_creatorId_status", (q) =>
+          q.eq("creatorId", userId).eq("status", status),
+        )
+        .take(MAX_ACTIVE_BETS),
+    ),
+    ctx.db
+      .query("bets")
+      .withIndex("by_opponentId_status", (q) =>
+        q.eq("opponentId", userId).eq("status", "active"),
+      )
+      .take(MAX_ACTIVE_BETS),
+  ]);
+  const total = counts.reduce((sum, bets) => sum + bets.length, 0);
+  if (total >= MAX_ACTIVE_BETS) {
+    throw new Error(`Maximum ${MAX_ACTIVE_BETS} active bets allowed`);
+  }
+}

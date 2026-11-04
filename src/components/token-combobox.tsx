@@ -7,7 +7,11 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { RemoteImage } from "@/components/ui/remote-image";
 import { CoinImage } from "@/components/ui/coin-image";
-import { TOKENS, getTokenImage, getTokenName } from "@/lib/constants/tokens";
+import {
+  TOKEN_SYMBOLS,
+  getTokenImage,
+  getTokenName,
+} from "@/lib/constants/tokens";
 import { formatPrice } from "@/lib/helpers/format";
 import { WipeReveal } from "@/components/ui/wipe-reveal";
 
@@ -20,7 +24,7 @@ type PriceMap = Record<string, TokenPriceData>;
 
 const TOKEN_FALLBACK = "/media/token-placeholder.svg";
 
-const allSymbols = Object.keys(TOKENS);
+const allSymbols = TOKEN_SYMBOLS;
 
 function TokenIcon({ src, size = 20 }: { src?: string; size?: number }) {
   return (

@@ -1,14 +1,14 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import schema from "../schema";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { modules } from "../test.setup";
 import { REGISTRATION_BONUS } from "../lib/constants";
 
 describe("users", () => {
   test("create assigns registration bonus and defaults", async () => {
     const t = convexTest({ schema, modules });
-    const userId = await t.mutation(api.users.create, {
+    const userId = await t.mutation(internal.users.create, {
       authId: "auth1",
       name: "Alice",
       username: "alice",
@@ -23,7 +23,7 @@ describe("users", () => {
 
   test("create records registration_bonus transaction", async () => {
     const t = convexTest({ schema, modules });
-    const userId = await t.mutation(api.users.create, {
+    const userId = await t.mutation(internal.users.create, {
       authId: "auth1",
       name: "Alice",
       username: "alice",
@@ -41,13 +41,13 @@ describe("users", () => {
 
   test("duplicate username throws", async () => {
     const t = convexTest({ schema, modules });
-    await t.mutation(api.users.create, {
+    await t.mutation(internal.users.create, {
       authId: "auth1",
       name: "Alice",
       username: "alice",
     });
     await expect(
-      t.mutation(api.users.create, {
+      t.mutation(internal.users.create, {
         authId: "auth2",
         name: "Bob",
         username: "alice",
@@ -57,7 +57,7 @@ describe("users", () => {
 
   test("getByAuthId returns user", async () => {
     const t = convexTest({ schema, modules });
-    await t.mutation(api.users.create, {
+    await t.mutation(internal.users.create, {
       authId: "auth1",
       name: "Alice",
       username: "alice",
@@ -69,7 +69,7 @@ describe("users", () => {
 
   test("getByUsername returns user", async () => {
     const t = convexTest({ schema, modules });
-    await t.mutation(api.users.create, {
+    await t.mutation(internal.users.create, {
       authId: "auth1",
       name: "Alice",
       username: "alice",
@@ -81,15 +81,40 @@ describe("users", () => {
     expect(user!.authId).toBe("auth1");
   });
 
-  test("updateProfile changes fields", async () => {
+  // Regression: the returns validators were hand-written and missed the
+  // win-stat fields, so any user who had played a bet made these throw.
+  test("getByUsername / getByAuthId return users with win stats", async () => {
     const t = convexTest({ schema, modules });
-    const userId = await t.mutation(api.users.create, {
+    const userId = await t.mutation(internal.users.create, {
       authId: "auth1",
       name: "Alice",
       username: "alice",
     });
-    await t.mutation(api.users.updateProfile, {
-      userId,
+    await t.run(async (ctx) => {
+      await ctx.db.patch(userId, {
+        totalWins: 3,
+        totalBetsResolved: 5,
+        currentWinStreak: 2,
+      });
+    });
+
+    const byUsername = await t.query(api.users.getByUsername, {
+      username: "alice",
+    });
+    expect(byUsername).toMatchObject({ totalWins: 3, currentWinStreak: 2 });
+
+    const byAuthId = await t.query(api.users.getByAuthId, { authId: "auth1" });
+    expect(byAuthId).toMatchObject({ totalBetsResolved: 5 });
+  });
+
+  test("updateProfile changes fields", async () => {
+    const t = convexTest({ schema, modules });
+    const userId = await t.mutation(internal.users.create, {
+      authId: "auth1",
+      name: "Alice",
+      username: "alice",
+    });
+    await t.withIdentity({ subject: "auth1" }).mutation(api.users.updateProfile, {
       name: "Alice Updated",
       username: "alice_v2",
     });
@@ -100,21 +125,32 @@ describe("users", () => {
 
   test("updateProfile with taken username throws", async () => {
     const t = convexTest({ schema, modules });
-    const aliceId = await t.mutation(api.users.create, {
+    await t.mutation(internal.users.create, {
       authId: "auth1",
       name: "Alice",
       username: "alice",
     });
-    await t.mutation(api.users.create, {
+    await t.mutation(internal.users.create, {
       authId: "auth2",
       name: "Bob",
       username: "bob",
     });
     await expect(
-      t.mutation(api.users.updateProfile, {
-        userId: aliceId,
+      t.withIdentity({ subject: "auth1" }).mutation(api.users.updateProfile, {
         username: "bob",
       }),
     ).rejects.toThrow("Username already taken");
+  });
+
+  test("updateProfile requires authentication", async () => {
+    const t = convexTest({ schema, modules });
+    await t.mutation(internal.users.create, {
+      authId: "auth1",
+      name: "Alice",
+      username: "alice",
+    });
+    await expect(
+      t.mutation(api.users.updateProfile, { name: "Hacked" }),
+    ).rejects.toThrow("Not authenticated");
   });
 });

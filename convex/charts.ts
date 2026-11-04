@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports -- public market data, used logged-out
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { fetchOHLCV, type OHLCVInterval } from "./lib/charts";

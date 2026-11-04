@@ -159,12 +159,10 @@ export function BetDialog({
       return;
     }
 
-    if (!user) return;
     setError(null);
     setStatus("loading");
     try {
       await createBet({
-        creatorId: user._id,
         type: betType,
         token: { symbol },
         betTerms:

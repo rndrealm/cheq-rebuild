@@ -1,3 +1,5 @@
+import { SUPPORTED_TOKENS } from "../../../convex/lib/constants";
+
 export type TokenInfo = {
   name: string;
   image: string;
@@ -56,7 +58,9 @@ export const TOKENS: Record<string, TokenInfo> = {
   POL: { name: "Polygon", image: "/media/tokens/pol.png" },
 };
 
-export const TOKEN_SYMBOLS = Object.keys(TOKENS);
+// Bettable tokens, shared with the backend. `TOKENS` above keeps display info
+// for every token, so older bets on removed tokens still render.
+export const TOKEN_SYMBOLS: readonly string[] = SUPPORTED_TOKENS;
 
 export function getTokenInfo(symbol: string): TokenInfo | undefined {
   return TOKENS[symbol];

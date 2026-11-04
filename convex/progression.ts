@@ -20,34 +20,44 @@ export const awardBetXp = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const winner = await ctx.db.get(args.winnerId);
-    const loser = await ctx.db.get(args.loserId);
-    if (!winner || !loser) return null;
-
-    const winnerXp = winner.xp + XP_PER_BET + XP_WIN_BONUS;
-    const loserXp = loser.xp + XP_PER_BET;
-
-    await ctx.db.patch(args.winnerId, {
-      xp: winnerXp,
-      level: getLevelForXp(winnerXp),
-      totalWins: (winner.totalWins ?? 0) + 1,
-      totalBetsResolved: (winner.totalBetsResolved ?? 0) + 1,
-      currentWinStreak: (winner.currentWinStreak ?? 0) + 1,
-    });
-
-    await ctx.db.patch(args.loserId, {
-      xp: loserXp,
-      level: getLevelForXp(loserXp),
-      totalBetsResolved: (loser.totalBetsResolved ?? 0) + 1,
-      currentWinStreak: 0,
-    });
-
-    await checkBadges(ctx, args.winnerId, args.betId);
-    await checkBadges(ctx, args.loserId, args.betId);
-
+    await applyBetXp(ctx, args.winnerId, args.loserId, args.betId);
     return null;
   },
 });
+
+// Call from inside a settlement mutation so XP is awarded in the same
+// transaction as the payout (no double-award or missed award).
+export async function applyBetXp(
+  ctx: MutationCtx,
+  winnerId: Id<"users">,
+  loserId: Id<"users">,
+  betId: Id<"bets">,
+) {
+  const winner = await ctx.db.get(winnerId);
+  const loser = await ctx.db.get(loserId);
+  if (!winner || !loser) return;
+
+  const winnerXp = winner.xp + XP_PER_BET + XP_WIN_BONUS;
+  const loserXp = loser.xp + XP_PER_BET;
+
+  await ctx.db.patch(winnerId, {
+    xp: winnerXp,
+    level: getLevelForXp(winnerXp),
+    totalWins: (winner.totalWins ?? 0) + 1,
+    totalBetsResolved: (winner.totalBetsResolved ?? 0) + 1,
+    currentWinStreak: (winner.currentWinStreak ?? 0) + 1,
+  });
+
+  await ctx.db.patch(loserId, {
+    xp: loserXp,
+    level: getLevelForXp(loserXp),
+    totalBetsResolved: (loser.totalBetsResolved ?? 0) + 1,
+    currentWinStreak: 0,
+  });
+
+  await checkBadges(ctx, winnerId, betId);
+  await checkBadges(ctx, loserId, betId);
+}
 
 export const awardTieXp = internalMutation({
   args: {

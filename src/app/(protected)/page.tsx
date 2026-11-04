@@ -1,60 +1,55 @@
 "use client";
 
 import Link from "next/link";
-import { signOut } from "@/lib/auth-client";
-import { Button } from "@/components/ui/button";
-import { TokenCard } from "@/components/token-card";
+import { AppHeader } from "@/components/app-header";
 import { EmptyState } from "@/components/empty-state";
-import { useUser } from "@/components/providers/user-provider";
+import { Placeholder } from "@/components/dashboard/placeholder";
+import { FeedCarousel } from "@/components/dashboard/feed-carousel";
+import { LiveBetWidget } from "@/components/dashboard/live-bet-widget";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { AppRoutes } from "@/lib/routes";
 
-export default function Home() {
-  const user = useUser();
+const FEED_PREVIEW_COUNT = 10;
+
+export default function Dashboard() {
   const feed = useQuery(api.bets.feed);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 px-6 py-8 bg-[#f6f6f6]">
-      {/* Columns match the TokenCard width so the header lines up with the
-          outer card edges and the whole block stays centered. */}
-      <div className="grid grid-cols-[repeat(auto-fill,--spacing(79.25))] justify-center gap-4">
-        <div className="col-span-full mb-2 flex items-center justify-between">
-          <div>
-            <h1 className="text-h2 font-bold text-fg-base">Feed</h1>
-            <p className="text-caption text-fg-400">
-              {user.points} pts available
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href={AppRoutes.createBet.path}>
-              <Button variant="secondary" size="sm">
-                New Bet
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-caption"
-              onClick={() => signOut()}
-            >
-              Sign Out
-            </Button>
-          </div>
-        </div>
+    <div className="flex flex-1 flex-col bg-[#f6f6f6]">
+      <AppHeader />
 
-        {feed?.map((bet) => (
-          <TokenCard key={bet._id} bet={bet} />
-        ))}
-      </div>
+      <main className="mx-auto grid w-full max-w-7xl grid-cols-1 items-start gap-6 px-6 py-6 lg:grid-cols-3">
+        {/* Column 1: main widget (live bets), sized to its content */}
+        <LiveBetWidget />
 
-      {feed === undefined ? (
-        <div className="flex flex-1 items-center justify-center">
-          <p className="text-caption text-fg-300">Loading...</p>
+        {/* Columns 2–3 */}
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+          <section className="flex flex-col gap-3">
+            <h2 className="text-base font-bold text-fg-base">Leaderboard</h2>
+            <Placeholder label="Leaderboard table" className="h-80" />
+          </section>
+
+          <section className="flex min-w-0 flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-fg-base">Feed</h2>
+              <Link
+                href={AppRoutes.feed.path}
+                className="text-caption font-semibold text-fg-400 hover:text-fg-base"
+              >
+                View all
+              </Link>
+            </div>
+            {feed === undefined ? (
+              <Placeholder label="Loading..." className="h-100" />
+            ) : feed.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <FeedCarousel bets={feed.slice(0, FEED_PREVIEW_COUNT)} />
+            )}
+          </section>
         </div>
-      ) : feed.length === 0 ? (
-        <EmptyState />
-      ) : null}
+      </main>
     </div>
   );
 }

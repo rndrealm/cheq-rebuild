@@ -434,4 +434,53 @@ describe("resolution", () => {
     expect(alice!.mu).toBeGreaterThan(bob!.mu);
     expect(alice!.displayRating).toBeGreaterThan(bob!.displayRating);
   });
+
+  test("settleSnapshot measures from the start price when the bet has one", async () => {
+    const t = convexTest({ schema, modules });
+
+    const aliceId = await t.run(async (ctx) =>
+      ctx.db.insert(
+        "users",
+        makeUser({ authId: "alice", username: "alice", points: 400 }),
+      ),
+    );
+    const bobId = await t.run(async (ctx) =>
+      ctx.db.insert(
+        "users",
+        makeUser({ authId: "bob", username: "bob", points: 400 }),
+      ),
+    );
+
+    // Created at 1.0, accepted (started) at 2.0, resolves at 1.5: up from
+    // creation but down from the start, so the "down" side (Bob) wins.
+    const betId = await t.run(async (ctx) =>
+      ctx.db.insert("bets", {
+        creatorId: aliceId,
+        opponentId: bobId,
+        type: "up_down",
+        status: "active",
+        token: TEST_TOKEN,
+        betTerms: { direction: "up" },
+        creatorWager: 100,
+        opponentWager: 100,
+        priceAtCreation: 1.0,
+        priceAtStart: 2.0,
+        startedAt: Date.now(),
+        duration: "1h",
+        expiresAt: Date.now() + 86400000,
+        resolvesAt: Date.now() + 3600000,
+        counterCount: 0,
+        updatedAt: Date.now(),
+      }),
+    );
+
+    await t.mutation(internal.resolutionHelpers.settleSnapshot, {
+      betId,
+      priceAtResolution: 1.5,
+      priceSource: "binance",
+    });
+
+    const bet = await t.run(async (ctx) => ctx.db.get(betId));
+    expect(bet!.winnerId).toBe(bobId);
+  });
 });

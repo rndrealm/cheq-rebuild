@@ -23,10 +23,15 @@ function generatePoints(seed: number, trend: number): number[] {
 }
 
 export function toPathD(points: number[]): string {
-  const coords = points.map((y, i) => ({
-    x: i / (points.length - 1),
-    y,
-  }));
+  return toSmoothPath(
+    points.map((y, i) => ({ x: i / (points.length - 1), y })),
+  );
+}
+
+// Smooth (Catmull-Rom → cubic Bézier) path through points in the 0–1 box.
+// Unlike `toPathD`, x positions are free, e.g. placed by time.
+export function toSmoothPath(coords: { x: number; y: number }[]): string {
+  if (coords.length === 0) return "";
 
   let d = `M${coords[0].x.toFixed(4)},${coords[0].y.toFixed(4)}`;
 
