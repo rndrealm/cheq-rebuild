@@ -475,6 +475,7 @@ function BetProgress({
             start={betWindow.start}
             end={betWindow.end}
             references={[{ value: 0, label: "Start" }]}
+            formatValue={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`}
             lines={[
               {
                 points: mineIsA ? lineB : lineA,
