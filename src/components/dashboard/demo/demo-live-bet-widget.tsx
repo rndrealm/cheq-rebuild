@@ -192,43 +192,53 @@ function BetUpdates({
       <span className="text-caption font-semibold leading-4 text-fg-base">
         Updates
       </span>
-      <AnimatePresence initial={false}>
-        {visible.map((event) => {
-          const copy = describeEvent(event, bet, bet.isCreator, rivalName(bet));
-          return (
-            <motion.div
-              key={event._id}
-              layout
-              initial={{ opacity: 0, y: -16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 400, damping: 32 }}
-              onMouseEnter={() => highlight.setActiveId(event._id)}
-              onMouseLeave={() => highlight.setActiveId(null)}
-              className="flex items-start gap-3"
-            >
-              <UpdateIcon
-                down={copy.tone === "bad"}
-                className="mt-0.5 size-4"
-                style={{ color: TONE_COLOR[copy.tone] }}
-              />
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-caption font-semibold leading-5 text-fg-base">
-                    {copy.title}
-                  </span>
-                  <span className="shrink-0 text-xs font-medium tabular-nums text-fg-300">
-                    <TimeAgo at={event.at} />
+      {/* Rows carry their own padding (bled out with negative margins) so
+          the hover fill has room without shifting the text; -my-1.5 keeps the
+          gap under "Updates" at 12px. */}
+      <div className="-my-1.5 flex flex-col">
+        <AnimatePresence initial={false}>
+          {visible.map((event) => {
+            const copy = describeEvent(event, bet, bet.isCreator, rivalName(bet));
+            // Lit when this row or its chart marker is hovered.
+            const active = highlight.activeId === event._id;
+            return (
+              <motion.div
+                key={event._id}
+                layout
+                initial={{ opacity: 0, y: -12, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ type: "spring", duration: 0.35, bounce: 0 }}
+                onMouseEnter={() => highlight.setActiveId(event._id)}
+                onMouseLeave={() => highlight.setActiveId(null)}
+                className={cn(
+                  "-mx-2 flex items-start gap-3 rounded-[10px] px-2 py-1.5 transition-colors duration-150",
+                  active && "bg-bg-200",
+                )}
+              >
+                <UpdateIcon
+                  down={copy.tone === "bad"}
+                  className="mt-0.5 size-4"
+                  style={{ color: TONE_COLOR[copy.tone] }}
+                />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-caption font-semibold leading-5 text-fg-base">
+                      {copy.title}
+                    </span>
+                    <span className="shrink-0 text-xs font-medium tabular-nums text-fg-300">
+                      <TimeAgo at={event.at} />
+                    </span>
+                  </div>
+                  <span className="text-pretty text-xs leading-4 tabular-nums text-fg-400">
+                    {copy.body}
                   </span>
                 </div>
-                <span className="text-pretty text-xs leading-4 text-fg-400">
-                  {copy.body}
-                </span>
-              </div>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
 
       {hidden > 0 && (
         <button
@@ -337,26 +347,26 @@ function LiveBetCard({
       </motion.div>
 
       <motion.div variants={SECTION} className="flex flex-col">
-      <div className="my-4.5 w-full border-t border-border/50" />
+        <div className="my-4.5 w-full border-t border-border/50" />
 
-      {/* Stake details */}
-      <div className="flex flex-col gap-4">
-        <span className="text-caption font-semibold leading-4 text-fg-base">
-          Stake Details
-        </span>
-        <div className="flex flex-col gap-3">
-          <Row label="Your stake" value={`${myWager} Points`} />
-          <Row label="Reward pool" value={`${pool} Points`} />
-          <Row label="Ends in" value={<Countdown to={bet.resolvesAt} />} />
+        {/* Stake details */}
+        <div className="flex flex-col gap-4">
+          <span className="text-caption font-semibold leading-4 text-fg-base">
+            Stake Details
+          </span>
+          <div className="flex flex-col gap-3">
+            <Row label="Your stake" value={`${myWager} Points`} />
+            <Row label="Reward pool" value={`${pool} Points`} />
+            <Row label="Ends in" value={<Countdown to={bet.resolvesAt} />} />
+          </div>
         </div>
-      </div>
 
-      <Link
-        href={AppRoutes.betDetail.path(bet._id)}
-        className="relative mt-5 self-start text-xs font-semibold text-fg-400 transition-colors duration-150 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:text-fg-base"
-      >
-        View bet
-      </Link>
+        <Link
+          href={AppRoutes.betDetail.path(bet._id)}
+          className="relative mt-5 self-start text-xs font-semibold text-fg-400 transition-colors duration-150 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:text-fg-base"
+        >
+          View bet
+        </Link>
       </motion.div>
     </div>
   );
