@@ -64,10 +64,52 @@ export const PlusIcon = ({ className }: { className?: string }) => (
     className={className}
   >
     <path
-      d="M12 7V12M12 12V17M12 12H7M12 12H17"
+      d="M12 5.5V12M12 12V18.5M12 12H5.5M12 12H18.5"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
+    />
+  </svg>
+);
+
+export const HomeIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden
+    className={className}
+  >
+    <path
+      d="M20 17V10.3299C20 9.48304 19.6421 8.67563 19.0146 8.10694L14.0146 3.57569C12.8713 2.53964 11.1287 2.53964 9.98544 3.57569L4.98544 8.10694C4.35793 8.67563 4 9.48304 4 10.3299V17C4 18.6569 5.34315 20 7 20H9C9.55228 20 10 19.5523 10 19V16C10 14.8954 10.8954 14 12 14C13.1046 14 14 14.8954 14 16V19C14 19.5523 14.4477 20 15 20H17C18.6569 20 20 18.6569 20 17Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const BetsIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden
+    className={className}
+  >
+    <path
+      d="M9.87823 3.87136L9.77368 3.9759C9.22999 4.51959 8.49258 4.82504 7.72369 4.82504C6.12254 4.82504 4.82455 6.12302 4.82455 7.72417C4.82455 8.49307 4.5191 9.23048 3.97541 9.77417L3.87087 9.87872C2.69929 11.0503 2.69929 12.9498 3.87087 14.1214L3.97541 14.2259C4.5191 14.7696 4.82455 15.507 4.82455 16.2759C4.82455 17.877 6.12254 19.175 7.72369 19.175C8.49258 19.175 9.22999 19.4805 9.77368 20.0242L9.87823 20.1287C11.0498 21.3003 12.9493 21.3003 14.1209 20.1287L14.2254 20.0242C14.7691 19.4805 15.5065 19.175 16.2754 19.175C17.8766 19.175 19.1745 17.877 19.1745 16.2759C19.1745 15.507 19.48 14.7696 20.0237 14.2259L20.1282 14.1214C21.2998 12.9498 21.2998 11.0503 20.1282 9.87872L20.0237 9.77417C19.48 9.23048 19.1745 8.49307 19.1745 7.72417C19.1745 6.12302 17.8766 4.82504 16.2754 4.82504C15.5065 4.82504 14.7691 4.51959 14.2254 3.9759L14.1209 3.87136C12.9493 2.69978 11.0498 2.69978 9.87823 3.87136Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9 13L11 14.75L14.5 9.75"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     />
   </svg>
 );

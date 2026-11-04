@@ -318,6 +318,38 @@ describe("recordCheckpoints", () => {
     expect(await t.query(api.checkpoints.listForBet, { betId: live })).toEqual([]);
   });
 
+  test("recentFeed: newest events across bets with player names; empty when logged out", async () => {
+    const t = convexTest({ schema, modules });
+    const { live } = await seed(t);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("betEvents", {
+        betId: live,
+        key: "progress_50",
+        kind: "progress",
+        progress: 50,
+        at: 1,
+        price: 150,
+      });
+      await ctx.db.insert("betEvents", {
+        betId: live,
+        key: "halfway",
+        kind: "halfway",
+        at: 2,
+        price: 160,
+      });
+    });
+
+    const rows = await t
+      .withIdentity({ subject: "a" })
+      .query(api.checkpoints.recentFeed, {});
+    expect(rows.map((r) => r.event.key)).toEqual(["halfway", "progress_50"]);
+    expect(rows[0].bet._id).toBe(live);
+    expect(rows[0].creator).toBe("alice");
+    expect(rows[0].opponent).toBe("bob");
+
+    expect(await t.query(api.checkpoints.recentFeed, {})).toEqual([]);
+  });
+
   test("liveSymbols lists tokens of active, unexpired bets", async () => {
     const t = convexTest({ schema, modules });
     await seed(t);

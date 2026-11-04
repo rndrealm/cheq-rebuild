@@ -3,7 +3,7 @@
 // DEMO COPY of the dashboard live bet widget (../live-bet-widget.tsx), fed by
 // the simulated market in ./live-bet-sim.ts instead of Convex + Binance. Kept
 // separate on purpose: iterate on the UI here, then port what works back.
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import type { FunctionReturnType } from "convex/server";
@@ -11,7 +11,7 @@ import type { api } from "../../../../convex/_generated/api";
 import { Avatar } from "@/components/avatar";
 import { RemoteImage } from "@/components/ui/remote-image";
 import { Placeholder } from "@/components/dashboard/placeholder";
-import { EXPRESSIONS, COLORS } from "@/lib/avatar-shapes";
+import { EXPRESSIONS, COLORS, FRAME_D } from "@/lib/avatar-shapes";
 import { getTokenImage, getTokenName } from "@/lib/constants/tokens";
 import {
   formatCountdown,
@@ -40,17 +40,38 @@ import {
 } from "@/lib/helpers/bet-events";
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { AppRoutes } from "@/lib/routes";
-import { ChevronDownIcon } from "@/lib/svgs";
+import { BetPager } from "@/components/dashboard/bet-pager";
 import mainAssets from "@/lib/assets";
 import { cn, simpleHash } from "@/lib/utils";
+import { UpdateIcon } from "@/components/dashboard/update-icon";
 
 export type LiveBet = FunctionReturnType<typeof api.bets.myActive>[number];
 export type BetEvent = Doc<"betEvents">;
 export type BetChartData = { a: BetSeries | null; b: BetSeries | null };
 
-const CARD_CLASS =
-  "relative w-full overflow-hidden rounded-[20px] border border-border bg-card";
-const CARD_SHADOW = { boxShadow: "0px 4px 20px 0px #00000014" };
+const CARD_CLASS = "relative w-full overflow-hidden rounded-[20px] bg-card";
+// Layered shadows instead of a solid border: a 1px ring for the edge, a tight
+// contact shadow and a soft ambient one. Adapts to any page background.
+const CARD_SHADOW = {
+  boxShadow:
+    "0 0 0 1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06), 0 4px 20px 0 rgb(0 0 0 / 0.06)",
+};
+
+// Swapping bets: sections stagger in; the exit is a quicker, smaller fade.
+const SWAP = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
+  exit: { opacity: 0, y: -4, transition: { duration: 0.12, ease: "easeIn" } },
+} as const;
+const SECTION = {
+  hidden: { opacity: 0, y: 8, filter: "blur(4px)" },
+  show: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: { type: "spring", duration: 0.35, bounce: 0 },
+  },
+} as const;
 
 // Shared between the chart markers and the update cards: hovering either
 // highlights the matching one.
@@ -109,27 +130,23 @@ function WidgetBody({
   return (
     <div className={CARD_CLASS} style={CARD_SHADOW}>
       {bets.length > 1 && (
-        <button
-          type="button"
-          onClick={() => {
-            setIndex(current + 1);
+        <BetPager
+          current={current}
+          total={bets.length}
+          onChange={(i) => {
+            setIndex(i);
             setActiveId(null);
           }}
-          aria-label={`Show next bet (${current + 1} of ${bets.length})`}
-          className="absolute top-5.5 right-5.5 z-10 flex h-8 cursor-pointer items-center gap-0.5 rounded-full bg-bg-300 pr-1.5 pl-3 text-xs font-semibold tabular-nums text-fg-base transition-colors hover:bg-bg-400"
-        >
-          {current + 1} / {bets.length}
-          <ChevronDownIcon className="size-5 -rotate-90" />
-        </button>
+        />
       )}
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={bet._id}
-          initial={{ opacity: 0, y: 12, scale: 0.98, filter: "blur(4px)" }}
-          animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: -12, scale: 0.98, filter: "blur(4px)" }}
-          transition={{ duration: 0.2 }}
+          variants={SWAP}
+          initial="hidden"
+          animate="show"
+          exit="exit"
         >
           <LiveBetCard
             bet={bet}
@@ -147,7 +164,7 @@ const VISIBLE_UPDATES = 3;
 
 const TONE_COLOR: Record<EventTone, string> = {
   good: "#47a95e",
-  bad: "#e4813f",
+  bad: "oklch(0.647 0.176 17)", // --loss-9
   neutral: "#A6A6A6",
 };
 
@@ -171,14 +188,13 @@ function BetUpdates({
   const hidden = events.length - VISIBLE_UPDATES;
 
   return (
-    <div className="mt-5 flex flex-col gap-2">
+    <div className="mt-6 flex flex-col gap-3">
       <span className="text-caption font-semibold leading-4 text-fg-base">
         Updates
       </span>
       <AnimatePresence initial={false}>
         {visible.map((event) => {
           const copy = describeEvent(event, bet, bet.isCreator, rivalName(bet));
-          const active = highlight.activeId === event._id;
           return (
             <motion.div
               key={event._id}
@@ -189,26 +205,25 @@ function BetUpdates({
               transition={{ type: "spring", stiffness: 400, damping: 32 }}
               onMouseEnter={() => highlight.setActiveId(event._id)}
               onMouseLeave={() => highlight.setActiveId(null)}
-              className={cn(
-                "flex items-start gap-3 rounded-xl bg-bg-200 p-3 transition-shadow",
-                active && "ring-2 ring-fg-base/10",
-              )}
+              className="flex items-start gap-3"
             >
-              <span
-                aria-hidden
-                className="mt-1.5 size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: TONE_COLOR[copy.tone] }}
+              <UpdateIcon
+                down={copy.tone === "bad"}
+                className="mt-0.5 size-4"
+                style={{ color: TONE_COLOR[copy.tone] }}
               />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-caption font-semibold leading-5 text-fg-base">
                     {copy.title}
                   </span>
-                  <span className="shrink-0 text-xs font-medium text-fg-300">
+                  <span className="shrink-0 text-xs font-medium tabular-nums text-fg-300">
                     <TimeAgo at={event.at} />
                   </span>
                 </div>
-                <span className="text-xs leading-4 text-fg-400">{copy.body}</span>
+                <span className="text-pretty text-xs leading-4 text-fg-400">
+                  {copy.body}
+                </span>
               </div>
             </motion.div>
           );
@@ -219,7 +234,7 @@ function BetUpdates({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="cursor-pointer self-start px-1 text-xs font-semibold text-fg-400 hover:text-fg-base"
+          className="relative cursor-pointer self-start px-1 text-xs font-semibold text-fg-400 transition-colors duration-150 after:absolute after:-inset-x-1 after:-inset-y-3 after:content-[''] hover:text-fg-base"
         >
           {expanded ? "Show less" : `Show ${hidden} earlier`}
         </button>
@@ -259,13 +274,14 @@ function LiveBetCard({
   return (
     <div className="flex flex-col p-5.5">
       {/* Token */}
-      <div className="flex items-center gap-3">
+      <motion.div variants={SECTION} className="flex items-center gap-3">
         <div className="flex -space-x-3">
           <RemoteImage
             src={getTokenImage(bet.token.symbol)}
             alt={bet.token.symbol}
             size={40}
             fallback={mainAssets.baseImage}
+            className="outline outline-1 -outline-offset-1 outline-black/10"
           />
           {bet.tokenB && (
             <RemoteImage
@@ -273,7 +289,7 @@ function LiveBetCard({
               alt={bet.tokenB.symbol}
               size={40}
               fallback={mainAssets.baseImage}
-              className="ring-2 ring-card"
+              className="ring-2 ring-card outline outline-1 -outline-offset-1 outline-black/10"
             />
           )}
         </div>
@@ -287,12 +303,16 @@ function LiveBetCard({
             </span>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Matchup */}
-      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
+      <motion.div
+        variants={SECTION}
+        className="mt-5 grid grid-cols-[1fr_auto_1fr] items-start gap-3"
+      >
         <Player
           id={viewerId}
+          photo={DEMO_PHOTOS.viewer}
           name="You"
           position={positions.mine}
           align="start"
@@ -300,20 +320,24 @@ function LiveBetCard({
         <span className="pt-3 text-caption font-semibold text-fg-300">vs</span>
         <Player
           id={bet.rival?.id}
+          photo={DEMO_PHOTOS.rival}
           name={bet.rival ? `@${bet.rival.username}` : "Unknown"}
           position={positions.theirs}
           align="end"
         />
-      </div>
+      </motion.div>
 
-      <BetProgress bet={bet} events={events} highlight={highlight} />
+      <motion.div variants={SECTION}>
+        <BetProgress bet={bet} events={events} highlight={highlight} />
 
-      {/* The card is keyed by bet, so flipping shows that bet's updates
-          without animating them all in; only updates that arrive while
-          watching slide in. */}
-      <BetUpdates bet={bet} events={events} highlight={highlight} />
+        {/* The card is keyed by bet, so flipping shows that bet's updates
+            without animating them all in; only updates that arrive while
+            watching slide in. */}
+        <BetUpdates bet={bet} events={events} highlight={highlight} />
+      </motion.div>
 
-      <div className="my-4.5 w-full border-t border-border" />
+      <motion.div variants={SECTION} className="flex flex-col">
+      <div className="my-4.5 w-full border-t border-border/50" />
 
       {/* Stake details */}
       <div className="flex flex-col gap-4">
@@ -329,16 +353,17 @@ function LiveBetCard({
 
       <Link
         href={AppRoutes.betDetail.path(bet._id)}
-        className="mt-5 self-start text-xs font-semibold text-fg-400 hover:text-fg-base"
+        className="relative mt-5 self-start text-xs font-semibold text-fg-400 transition-colors duration-150 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:text-fg-base"
       >
         View bet
       </Link>
+      </motion.div>
     </div>
   );
 }
 
 const COLOR_UP = "#47a95e";
-const COLOR_DOWN = "#e4813f";
+const COLOR_DOWN = "oklch(0.647 0.176 17)"; // --loss-9 (literal: SVG stroke attrs can't read CSS vars)
 const COLOR_EVEN = "#A6A6A6";
 const COLOR_RIVAL_LINE = "#D1D1D1";
 
@@ -520,7 +545,7 @@ function ChangeText({
     <span
       className={cn(
         "font-semibold tabular-nums",
-        value >= 0 ? "text-[#47a95e]" : "text-destructive",
+        value >= 0 ? "text-[#47a95e]" : "text-loss-10",
         className,
       )}
     >
@@ -573,13 +598,51 @@ function StandingPill({ standing }: { standing: Standing }) {
   );
 }
 
+// Demo-only profile pictures: mf-doom.jpg is a cloud-mask illustration the
+// user supplied; kurosawa.jpg is "Akirakurosawa-onthesetof7samurai-1953-page88.jpg"
+// from Wikimedia Commons (public domain).
+const DEMO_PHOTOS = {
+  viewer: "/media/demo/mf-doom.jpg",
+  rival: "/media/demo/kurosawa.jpg",
+};
+
+// A photo clipped to the Cheq avatar frame, with a faint inner edge.
+function PhotoAvatar({ src, size = 40 }: { src: string; size?: number }) {
+  const clipId = `photo-avatar${useId()}`;
+  return (
+    <svg viewBox="0 0 40 40" width={size} height={size} aria-hidden>
+      <defs>
+        <clipPath id={clipId}>
+          <path d={FRAME_D} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clipId})`}>
+        <image
+          href={src}
+          width="40"
+          height="40"
+          preserveAspectRatio="xMidYMid slice"
+        />
+        <path
+          d={FRAME_D}
+          fill="none"
+          stroke="rgb(0 0 0 / 0.1)"
+          strokeWidth="2"
+        />
+      </g>
+    </svg>
+  );
+}
+
 function Player({
   id,
+  photo,
   name,
   position,
   align,
 }: {
   id: string | undefined;
+  photo?: string;
   name: string;
   position: string;
   align: "start" | "end";
@@ -592,11 +655,15 @@ function Player({
         align === "start" ? "items-start" : "items-end text-right",
       )}
     >
-      <Avatar
-        expressionIndex={simpleHash(seed) % EXPRESSIONS.length}
-        colorIndex={simpleHash(seed + "c") % COLORS.length}
-        size={40}
-      />
+      {photo ? (
+        <PhotoAvatar src={photo} />
+      ) : (
+        <Avatar
+          expressionIndex={simpleHash(seed) % EXPRESSIONS.length}
+          colorIndex={simpleHash(seed + "c") % COLORS.length}
+          size={40}
+        />
+      )}
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-sm font-semibold leading-5 text-fg-base">
           {name}
@@ -642,7 +709,7 @@ function EmptyWidget() {
       style={CARD_SHADOW}
     >
       <p className="text-sm font-semibold text-fg-base">No live bets</p>
-      <p className="text-caption text-fg-300">
+      <p className="text-caption text-gray-11">
         Bets you&apos;re in will show up here.
       </p>
     </div>

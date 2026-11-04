@@ -11,11 +11,11 @@ export function Placeholder({
   return (
     <div
       className={cn(
-        "flex items-center justify-center rounded-[20px] bg-fg-base/10",
+        "flex items-center justify-center rounded-[20px] bg-gray-5",
         className,
       )}
     >
-      <span className="text-caption font-semibold text-fg-300">{label}</span>
+      <span className="text-caption font-semibold text-gray-11">{label}</span>
     </div>
   );
 }
