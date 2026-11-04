@@ -43,6 +43,7 @@ export function BetChart({
   references,
   markers = [],
   onMarkerHover,
+  className,
 }: {
   start: number;
   end: number;
@@ -50,6 +51,8 @@ export function BetChart({
   references: ReferenceLine[];
   markers?: ChartMarker[];
   onMarkerHover?: (id: string | null) => void;
+  /** Overrides the default h-40 height. */
+  className?: string;
 }) {
   // Fit the y-range to the data and every reference line so a far-off target
   // stays on the chart.
@@ -72,7 +75,7 @@ export function BetChart({
   const toY = (v: number) => Y_TOP + ((max - v) / (max - min)) * Y_SPAN;
 
   return (
-    <div className="relative h-40 w-full">
+    <div className={cn("relative h-40 w-full", className)}>
       {/* Reference lines are HTML so the dashes stay crisp at any width. */}
       {references.map((ref) => (
         <div

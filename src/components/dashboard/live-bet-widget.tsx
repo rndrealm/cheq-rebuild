@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useQuery } from "convex/react";
@@ -38,10 +38,12 @@ import {
 } from "@/lib/helpers/bet-events";
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { AppRoutes } from "@/lib/routes";
-import { ChevronDownIcon } from "@/lib/svgs";
+import { BetPager } from "@/components/dashboard/bet-pager";
 import mainAssets from "@/lib/assets";
 import { cn, simpleHash } from "@/lib/utils";
 import { useUser } from "@/components/providers/user-provider";
+import { UpdateIcon } from "@/components/dashboard/update-icon";
+import { CreateBetForm } from "@/components/create-bet-form";
 
 type LiveBet = FunctionReturnType<typeof api.bets.myActive>[number];
 
@@ -58,12 +60,21 @@ type Highlight = {
   setActiveId: (id: string | null) => void;
 };
 
-/**
- * Dashboard main widget: the caller's live bets, one at a time, with a button
- * to flip to the next. Checkpoint updates for the bet shown slide in under the
- * chart (above Stake Details) as the server records them.
- */
-export function LiveBetWidget() {
+// The dashboard shows the selected live bet twice (this widget and the big
+// chart beside it), so the bet list, which bet is shown and the hovered
+// checkpoint live here and both read them.
+type LiveBetsState = {
+  bets: LiveBet[] | undefined;
+  current: number;
+  bet: LiveBet | undefined;
+  events: BetEvent[] | undefined;
+  setIndex: (index: number) => void;
+  highlight: Highlight;
+};
+
+const LiveBetsContext = createContext<LiveBetsState | null>(null);
+
+export function LiveBetsProvider({ children }: { children: React.ReactNode }) {
   const bets = useQuery(api.bets.myActive);
   const [index, setIndex] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -76,26 +87,46 @@ export function LiveBetWidget() {
     bet ? { betId: bet._id } : "skip",
   );
 
+  return (
+    <LiveBetsContext
+      value={{
+        bets,
+        current,
+        bet,
+        events,
+        setIndex: (i) => {
+          setIndex(i);
+          setActiveId(null);
+        },
+        highlight: { activeId, setActiveId },
+      }}
+    >
+      {children}
+    </LiveBetsContext>
+  );
+}
+
+function useLiveBets(): LiveBetsState {
+  const state = useContext(LiveBetsContext);
+  if (!state) throw new Error("Wrap live bet components in <LiveBetsProvider>");
+  return state;
+}
+
+/**
+ * Dashboard main widget: the caller's live bets, one at a time, with a button
+ * to flip to the next. Checkpoint updates for the bet shown slide in under the
+ * chart (above Stake Details) as the server records them.
+ */
+export function LiveBetWidget() {
+  const { bets, current, bet, events, setIndex, highlight } = useLiveBets();
+
   if (bets === undefined) return <Placeholder label="" className="h-120" />;
   if (!bet) return <EmptyWidget />;
-
-  const highlight: Highlight = { activeId, setActiveId };
 
   return (
     <div className={CARD_CLASS} style={CARD_SHADOW}>
       {bets.length > 1 && (
-        <button
-          type="button"
-          onClick={() => {
-            setIndex(current + 1);
-            setActiveId(null);
-          }}
-          aria-label={`Show next bet (${current + 1} of ${bets.length})`}
-          className="absolute top-5.5 right-5.5 z-10 flex h-8 cursor-pointer items-center gap-0.5 rounded-full bg-bg-300 pr-1.5 pl-3 text-xs font-semibold tabular-nums text-fg-base transition-colors hover:bg-bg-400"
-        >
-          {current + 1} / {bets.length}
-          <ChevronDownIcon className="size-5 -rotate-90" />
-        </button>
+        <BetPager current={current} total={bets.length} onChange={setIndex} />
       )}
 
       <AnimatePresence mode="wait" initial={false}>
@@ -113,11 +144,61 @@ export function LiveBetWidget() {
   );
 }
 
+/**
+ * Large chart of the bet the widget is showing: same price, standing and
+ * checkpoint markers, at dashboard width. Flipping bets in the widget swaps
+ * it, and hovering a marker here highlights the matching update there.
+ */
+export function LiveBetChartPanel() {
+  const { bets, bet, events, highlight } = useLiveBets();
+
+  if (bets === undefined) return <Placeholder label="" className="h-110" />;
+  if (!bet) {
+    return (
+      <div
+        className={cn(
+          CARD_CLASS,
+          "flex h-110 flex-col items-center justify-center gap-1 px-6 text-center",
+        )}
+        style={CARD_SHADOW}
+      >
+        <p className="text-sm font-semibold text-fg-base">No live bets</p>
+        <p className="text-caption text-gray-11">
+          Your live bet&apos;s chart will show here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={CARD_CLASS} style={CARD_SHADOW}>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={bet._id}
+          initial={{ opacity: 0, filter: "blur(4px)" }}
+          animate={{ opacity: 1, filter: "blur(0px)" }}
+          exit={{ opacity: 0, filter: "blur(4px)" }}
+          transition={{ duration: 0.2 }}
+          className="flex flex-col p-5.5"
+        >
+          <TokenHeader bet={bet} />
+          <BetProgress
+            bet={bet}
+            events={events ?? []}
+            highlight={highlight}
+            size="large"
+          />
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 const VISIBLE_UPDATES = 3;
 
 const TONE_COLOR: Record<EventTone, string> = {
   good: "#47a95e",
-  bad: "#e4813f",
+  bad: "oklch(0.647 0.176 17)", // --loss-9
   neutral: "#A6A6A6",
 };
 
@@ -141,14 +222,13 @@ function BetUpdates({
   const hidden = events.length - VISIBLE_UPDATES;
 
   return (
-    <div className="mt-5 flex flex-col gap-2">
+    <div className="mt-6 flex flex-col gap-3">
       <span className="text-caption font-semibold leading-4 text-fg-base">
         Updates
       </span>
       <AnimatePresence initial={false}>
         {visible.map((event) => {
           const copy = describeEvent(event, bet, bet.isCreator, rivalName(bet));
-          const active = highlight.activeId === event._id;
           return (
             <motion.div
               key={event._id}
@@ -159,15 +239,12 @@ function BetUpdates({
               transition={{ type: "spring", stiffness: 400, damping: 32 }}
               onMouseEnter={() => highlight.setActiveId(event._id)}
               onMouseLeave={() => highlight.setActiveId(null)}
-              className={cn(
-                "flex items-start gap-3 rounded-xl bg-bg-200 p-3 transition-shadow",
-                active && "ring-2 ring-fg-base/10",
-              )}
+              className="flex items-start gap-3"
             >
-              <span
-                aria-hidden
-                className="mt-1.5 size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: TONE_COLOR[copy.tone] }}
+              <UpdateIcon
+                down={copy.tone === "bad"}
+                className="mt-0.5 size-4"
+                style={{ color: TONE_COLOR[copy.tone] }}
               />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <div className="flex items-baseline justify-between gap-2">
@@ -208,6 +285,44 @@ function TimeAgo({ at }: { at: number }) {
   return <>{formatTimeAgo(now - at)}</>;
 }
 
+function TokenHeader({ bet }: { bet: LiveBet }) {
+  const pair = bet.tokenB
+    ? `${bet.token.symbol} vs ${bet.tokenB.symbol}`
+    : `${bet.token.symbol} / USDT`;
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex -space-x-3">
+        <RemoteImage
+          src={getTokenImage(bet.token.symbol)}
+          alt={bet.token.symbol}
+          size={40}
+          fallback={mainAssets.baseImage}
+        />
+        {bet.tokenB && (
+          <RemoteImage
+            src={getTokenImage(bet.tokenB.symbol)}
+            alt={bet.tokenB.symbol}
+            size={40}
+            fallback={mainAssets.baseImage}
+            className="ring-2 ring-card"
+          />
+        )}
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-sm font-semibold leading-5 text-fg-base">
+          {pair}
+        </span>
+        {!bet.tokenB && (
+          <span className="text-xs font-medium leading-4 text-fg-300">
+            {getTokenName(bet.token.symbol)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LiveBetCard({
   bet,
   events,
@@ -221,42 +336,9 @@ function LiveBetCard({
   const positions = getPositions(bet, bet.isCreator);
   const myWager = bet.isCreator ? bet.creatorWager : bet.opponentWager;
   const pool = bet.creatorWager + bet.opponentWager;
-  const pair = bet.tokenB
-    ? `${bet.token.symbol} vs ${bet.tokenB.symbol}`
-    : `${bet.token.symbol} / USDT`;
-
   return (
     <div className="flex flex-col p-5.5">
-      {/* Token */}
-      <div className="flex items-center gap-3">
-        <div className="flex -space-x-3">
-          <RemoteImage
-            src={getTokenImage(bet.token.symbol)}
-            alt={bet.token.symbol}
-            size={40}
-            fallback={mainAssets.baseImage}
-          />
-          {bet.tokenB && (
-            <RemoteImage
-              src={getTokenImage(bet.tokenB.symbol)}
-              alt={bet.tokenB.symbol}
-              size={40}
-              fallback={mainAssets.baseImage}
-              className="ring-2 ring-card"
-            />
-          )}
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold leading-5 text-fg-base">
-            {pair}
-          </span>
-          {!bet.tokenB && (
-            <span className="text-xs font-medium leading-4 text-fg-300">
-              {getTokenName(bet.token.symbol)}
-            </span>
-          )}
-        </div>
-      </div>
+      <TokenHeader bet={bet} />
 
       {/* Matchup */}
       <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
@@ -282,7 +364,7 @@ function LiveBetCard({
           watching slide in. */}
       <BetUpdates bet={bet} events={events} highlight={highlight} />
 
-      <div className="my-4.5 w-full border-t border-border" />
+      <div className="my-4.5 w-full border-t border-border/50" />
 
       {/* Stake details */}
       <div className="flex flex-col gap-4">
@@ -307,7 +389,7 @@ function LiveBetCard({
 }
 
 const COLOR_UP = "#47a95e";
-const COLOR_DOWN = "#e4813f";
+const COLOR_DOWN = "oklch(0.647 0.176 17)"; // --loss-9 (literal: SVG stroke attrs can't read CSS vars)
 const COLOR_EVEN = "#A6A6A6";
 const COLOR_RIVAL_LINE = "#D1D1D1";
 
@@ -322,11 +404,14 @@ function BetProgress({
   bet,
   events,
   highlight,
+  size = "default",
 }: {
   bet: LiveBet;
   events: BetEvent[];
   highlight: Highlight;
+  size?: "default" | "large";
 }) {
+  const chartClassName = size === "large" ? "h-80" : undefined;
   const betWindow = getBetWindow(bet);
   const startPrices = getStartPrices(bet);
   const isVs = bet.type === "token_vs_token" && !!bet.tokenB;
@@ -429,6 +514,7 @@ function BetProgress({
             ]}
             markers={markers}
             onMarkerHover={highlight.setActiveId}
+            className={chartClassName}
           />
         </div>
       </>
@@ -480,6 +566,7 @@ function BetProgress({
           lines={[{ points: data.a.points, color: STANDING_COLOR[standing] }]}
           markers={events.map((event) => toMarker(event, event.price))}
           onMarkerHover={highlight.setActiveId}
+          className={chartClassName}
         />
       </div>
     </>
@@ -497,7 +584,7 @@ function ChangeText({
     <span
       className={cn(
         "font-semibold tabular-nums",
-        value >= 0 ? "text-[#47a95e]" : "text-destructive",
+        value >= 0 ? "text-[#47a95e]" : "text-loss-10",
         className,
       )}
     >
@@ -609,19 +696,16 @@ function Countdown({ to }: { to: number }) {
   return <>{formatCountdown(to - now)}</>;
 }
 
+// No live bets: offer the "open a bet" form right here. A new bet starts as
+// a pending challenge, so it joins this widget once someone accepts; the form
+// remounts (key) after each one so it's ready for the next.
 function EmptyWidget() {
+  const [formKey, setFormKey] = useState(0);
   return (
-    <div
-      className={cn(
-        CARD_CLASS,
-        "flex h-60 flex-col items-center justify-center gap-1 px-6 text-center",
-      )}
-      style={CARD_SHADOW}
-    >
-      <p className="text-sm font-semibold text-fg-base">No live bets</p>
-      <p className="text-caption text-fg-300">
-        Bets you&apos;re in will show up here.
-      </p>
-    </div>
+    <CreateBetForm
+      key={formKey}
+      onCreated={() => setFormKey((k) => k + 1)}
+      className="w-full"
+    />
   );
 }

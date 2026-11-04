@@ -123,7 +123,9 @@ export default defineSchema({
     progress: v.optional(v.number()),
     // lead_change: who just took the lead.
     leader: v.optional(v.union(v.literal("creator"), v.literal("opponent"))),
-  }).index("by_betId_and_key", ["betId", "key"]),
+  })
+    .index("by_betId_and_key", ["betId", "key"])
+    .index("by_at", ["at"]),
 
   rivalries: defineTable({
     userAId: v.id("users"),

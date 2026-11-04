@@ -59,12 +59,12 @@ export function getStatusConfig(
           }
         : {
             label: "Lost",
-            text: "text-[#dc2626]",
-            border: "border-[#fca5a5]",
-            gradient: "from-[#fca5a5] from-[29%] to-[#f87171]",
+            text: "text-loss-11",
+            border: "border-loss-7",
+            gradient: "from-loss-6 from-[29%] to-loss-7",
             insetShadow:
-              "shadow-[inset_-1px_-1px_0px_0px_#ef5350,inset_1px_1px_0px_0px_#fdd]",
-            textShadow: "[text-shadow:0px_0.5px_0px_#ef5350]",
+              "shadow-[inset_-1px_-1px_0px_0px_var(--loss-8),inset_1px_1px_0px_0px_var(--loss-4)]",
+            textShadow: "[text-shadow:0px_0.5px_0px_var(--loss-8)]",
           };
     case "tied":
     case "expired":

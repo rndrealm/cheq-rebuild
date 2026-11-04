@@ -76,6 +76,51 @@ export function describeEvent(
   }
 }
 
+/**
+ * Words a checkpoint for onlookers (the dashboard feed): third person, with
+ * the players' handles, e.g. "@alice took the lead on SOL".
+ */
+export function describeFeedEvent(
+  event: Doc<"betEvents">,
+  bet: EventBet,
+  creator: string | null,
+  opponent: string | null,
+): { title: string; body: string } {
+  const symbol = bet.token.symbol;
+  const target = bet.betTerms.targetPrice;
+  const targetText = target !== undefined ? formatPrice(target) : "the target";
+  const handle = (name: string | null) => (name ? `@${name}` : "Someone");
+  const matchup = opponent
+    ? `${handle(creator)} vs ${handle(opponent)}`
+    : `${handle(creator)}'s bet`;
+
+  switch (event.kind) {
+    case "progress":
+      return {
+        title: `${symbol} is ${event.progress}% of the way to ${targetText}`,
+        body: matchup,
+      };
+    case "near_target":
+      return {
+        title: `${symbol} is within 1% of ${targetText}`,
+        body: matchup,
+      };
+    case "lead_change": {
+      const leader = event.leader === "creator" ? creator : opponent;
+      return {
+        title: `${handle(leader)} took the lead on ${symbol}`,
+        body: priceContext(event, bet),
+      };
+    }
+    case "halfway":
+    case "final_stretch":
+      return {
+        title: `${event.kind === "halfway" ? "Halfway" : "Final stretch"}: ${matchup}`,
+        body: priceContext(event, bet),
+      };
+  }
+}
+
 // hit_price: "winning" means the target was touched for the chaser (creator)
 // and not touched for the opponent.
 function hitStandingText(chasing: boolean, winning: boolean): string {

@@ -9,6 +9,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { detectCheckpoints } from "./lib/checkpoints";
 import { optionalAuthQuery } from "./lib/functions";
 import { fetchPrices } from "./lib/prices";
@@ -46,6 +47,48 @@ export const listForBet = optionalAuthQuery({
       .withIndex("by_betId_and_key", (q) => q.eq("betId", args.betId))
       .take(MAX_EVENTS_PER_BET);
     return events.sort((a, b) => b.at - a.at);
+  },
+});
+
+// Upper bound on events in the dashboard feed.
+const FEED_EVENTS = 10;
+
+// The newest checkpoints across all bets, for the dashboard feed, each with
+// its bet and both players' names so the client can word it in the third
+// person. Signed-in users only (empty when logged out); the bets themselves
+// are already public via bets.feed.
+export const recentFeed = optionalAuthQuery({
+  args: {},
+  handler: async (ctx) => {
+    if (!ctx.user) return [];
+    const events = await ctx.db
+      .query("betEvents")
+      .withIndex("by_at")
+      .order("desc")
+      .take(FEED_EVENTS);
+
+    const names = new Map<string, string | null>();
+    const nameOf = async (id: Id<"users"> | undefined) => {
+      if (!id) return null;
+      if (!names.has(id)) {
+        const user = await ctx.db.get(id);
+        names.set(id, user ? user.username : null);
+      }
+      return names.get(id) ?? null;
+    };
+
+    const rows = [];
+    for (const event of events) {
+      const bet = await ctx.db.get(event.betId);
+      if (!bet) continue;
+      rows.push({
+        event,
+        bet,
+        creator: await nameOf(bet.creatorId),
+        opponent: await nameOf(bet.opponentId),
+      });
+    }
+    return rows;
   },
 });
 
