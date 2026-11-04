@@ -1,4 +1,5 @@
 import { Id } from "../../../convex/_generated/dataModel";
+import { formatPrice } from "./format";
 
 export type BetStatus =
   | "pending"
@@ -150,6 +151,65 @@ export function getBetDescription(
             : (bet.tokenB?.symbol ?? ""),
       };
   }
+}
+
+// What each side is betting on, worded from the viewer's side. The creator
+// picks the terms; the opponent takes the opposite outcome. On hit_price the
+// creator wins if the target is touched, the opponent if the deadline passes
+// first.
+export function getPositions(
+  bet: Pick<FeedBet, "type" | "token" | "tokenB" | "betTerms">,
+  isCreator: boolean,
+): { mine: string; theirs: string } {
+  const symbol = bet.token.symbol;
+  let creator: string;
+  let opponent: string;
+
+  switch (bet.type) {
+    case "up_down": {
+      const up = bet.betTerms.direction === "up";
+      creator = `${symbol} goes ${up ? "up" : "down"}`;
+      opponent = `${symbol} goes ${up ? "down" : "up"}`;
+      break;
+    }
+    case "hit_price": {
+      const target =
+        bet.betTerms.targetPrice !== undefined
+          ? formatPrice(bet.betTerms.targetPrice)
+          : "target";
+      const under = bet.betTerms.direction === "down";
+      creator = under ? `${symbol} drops to ${target}` : `${symbol} hits ${target}`;
+      opponent = under
+        ? `${symbol} stays above ${target}`
+        : `${symbol} stays below ${target}`;
+      break;
+    }
+    case "token_vs_token": {
+      const a = symbol;
+      const b = bet.tokenB?.symbol ?? "";
+      const creatorPicksA = bet.betTerms.creatorSide === "tokenA";
+      creator = creatorPicksA ? `${a} beats ${b}` : `${b} beats ${a}`;
+      opponent = creatorPicksA ? `${b} beats ${a}` : `${a} beats ${b}`;
+      break;
+    }
+  }
+
+  return isCreator
+    ? { mine: creator, theirs: opponent }
+    : { mine: opponent, theirs: creator };
+}
+
+// Live countdown: "2d 4h", "3h 12m", then "12:04" in the final hour.
+export function formatCountdown(ms: number): string {
+  if (ms <= 0) return "0:00";
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 export const DURATION_LABELS: Record<string, string> = {

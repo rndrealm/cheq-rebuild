@@ -7,6 +7,7 @@ import { z } from "zod";
 import { useAction } from "convex/react";
 import { useUser } from "@/components/providers/user-provider";
 import { api } from "../../../../convex/_generated/api";
+import { MIN_WAGER, MAX_WAGER } from "../../../../convex/lib/constants";
 import { AppRoutes } from "@/lib/routes";
 import { FieldError } from "@/components/ui/form-field";
 import { DurationPicker } from "@/components/duration-picker";
@@ -40,9 +41,6 @@ const ELLIPTIC_REVEAL_STYLES = `
     --reveal: 160%;
   }
 `;
-
-const MIN_WAGER = 10;
-const MAX_WAGER = 500;
 
 // Lets the "Position Opened" reveal (0.7s) finish before navigating away.
 const REDIRECT_DELAY_MS = 1000;
@@ -140,6 +138,7 @@ export default function CreateBetPage() {
         betTerms.direction = value.direction;
       } else if (value.type === "hit_price") {
         betTerms.targetPrice = value.targetPrice;
+        betTerms.direction = value.direction;
       } else if (value.type === "token_vs_token") {
         betTerms.creatorSide = value.creatorSide;
       }
@@ -147,7 +146,6 @@ export default function CreateBetPage() {
       setIsPending(true);
       try {
         await createBet({
-          creatorId: user._id,
           type: value.type,
           token: value.token,
           tokenB:
@@ -369,7 +367,13 @@ export default function CreateBetPage() {
           </form.Field>
 
           {/* Stake Amount */}
-          <form.Field name="wager">
+          <form.Field
+            name="wager"
+            validators={{
+              onChange: ({ value }) =>
+                value > user.points ? "Not enough points" : undefined,
+            }}
+          >
             {(field) => (
               <div className="">
                 <div className="flex items-center justify-between">

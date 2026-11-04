@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import {
   DEFAULT_MU,
@@ -19,10 +19,11 @@ const TOKENS = {
   ETH: { symbol: "ETH" },
   PEPE: { symbol: "PEPE" },
   DOGE: { symbol: "DOGE" },
-  WIF: { symbol: "WIF" },
+  LINK: { symbol: "LINK" },
 } as const;
 
-export const seedBets = mutation({
+// Dev only. Run with `npx convex run seed:seedBets '{"userId":"..."}'`.
+export const seedBets = internalMutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -140,18 +141,18 @@ export const seedBets = mutation({
       updatedAt: now - 3600_000,
     });
 
-    // 5. Pending (received): MoonShot challenged you — WIF vs SOL
+    // 5. Pending (received): MoonShot challenged you — LINK vs SOL
     await ctx.db.insert("bets", {
       creatorId: opponentIds[1],
       opponentId: args.userId,
       type: "token_vs_token",
       status: "pending",
-      token: TOKENS.WIF,
+      token: TOKENS.LINK,
       tokenB: TOKENS.SOL,
       betTerms: { creatorSide: "tokenA" },
       creatorWager: 50,
       opponentWager: 50,
-      priceAtCreation: 0.235,
+      priceAtCreation: 14.2,
       priceAtCreationB: 118.5,
       duration: "1h",
       expiresAt: now + CHALLENGE_EXPIRY_MS,

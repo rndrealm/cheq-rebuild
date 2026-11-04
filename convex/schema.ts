@@ -62,8 +62,14 @@ export default defineSchema({
     }),
     creatorWager: v.number(),
     opponentWager: v.number(),
+    // Price when the challenge was created (a preview only once the bet starts).
     priceAtCreation: v.number(),
     priceAtCreationB: v.optional(v.number()),
+    // The bet starts when it's accepted: these are the baseline for settlement.
+    // Missing on bets accepted before this was added; fall back to priceAtCreation.
+    priceAtStart: v.optional(v.number()),
+    priceAtStartB: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
     priceAtResolution: v.optional(v.number()),
     priceAtResolutionB: v.optional(v.number()),
     winnerId: v.optional(v.id("users")),
@@ -81,6 +87,8 @@ export default defineSchema({
       v.union(
         v.literal("snapshot"),
         v.literal("touch"),
+        // hit_price bet reached its deadline without hitting the target
+        v.literal("deadline"),
         v.literal("manual"),
       ),
     ),
@@ -93,6 +101,29 @@ export default defineSchema({
     .index("by_creatorId_status", ["creatorId", "status"])
     .index("by_opponentId_status", ["opponentId", "status"])
     .index("by_status_resolvesAt", ["status", "resolvesAt"]),
+
+  // Checkpoints in a live bet ("75% of the way to the target", "lead change",
+  // "halfway"), detected by the checkpoint poller. Neutral facts: the UI words
+  // them from each viewer's side. `key` is unique per bet, so a checkpoint
+  // can only be recorded once.
+  betEvents: defineTable({
+    betId: v.id("bets"),
+    key: v.string(),
+    kind: v.union(
+      v.literal("progress"),
+      v.literal("near_target"),
+      v.literal("lead_change"),
+      v.literal("halfway"),
+      v.literal("final_stretch"),
+    ),
+    at: v.number(),
+    price: v.number(),
+    priceB: v.optional(v.number()),
+    // progress: the threshold crossed (50, 75, 90).
+    progress: v.optional(v.number()),
+    // lead_change: who just took the lead.
+    leader: v.optional(v.union(v.literal("creator"), v.literal("opponent"))),
+  }).index("by_betId_and_key", ["betId", "key"]),
 
   rivalries: defineTable({
     userAId: v.id("users"),

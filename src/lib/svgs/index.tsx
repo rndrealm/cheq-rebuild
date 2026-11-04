@@ -37,11 +37,64 @@ export const LANDING_AVATAR_FACE_PATH =
 export const LANDING_AVATAR_PATH =
   "M22.938 12c.862 0 1.562.7 1.562 1.563v.937a.625.625 0 1 0 1.25 0v-.937c0-.863.7-1.563 1.563-1.563h9.558a1.38 1.38 0 0 1 1.379 1.379V14.5a.625.625 0 1 0 1.25 0v-1.121A1.38 1.38 0 0 1 40.879 12h5.913A5.21 5.21 0 0 1 52 17.208v5.469a1.823 1.823 0 0 1-1.823 1.823H49.5a.625.625 0 1 0 0 1.25h.938c.862 0 1.562.7 1.562 1.563v9.375c0 .862-.7 1.562-1.562 1.562H49.5a.625.625 0 1 0 0 1.25h.938c.862 0 1.562.7 1.562 1.563v4.687A6.25 6.25 0 0 1 45.75 52h-4.687c-.863 0-1.563-.7-1.563-1.562V49.5a.625.625 0 1 0-1.25 0v.938c0 .862-.7 1.562-1.562 1.562h-9.376c-.862 0-1.562-.7-1.562-1.562V49.5a.625.625 0 1 0-1.25 0v.938c0 .862-.7 1.562-1.562 1.562H18.25A6.25 6.25 0 0 1 12 45.75v-4.687c0-.863.7-1.563 1.563-1.563h.937a.625.625 0 1 0 0-1.25h-.937c-.863 0-1.563-.7-1.563-1.562v-9.376c0-.862.7-1.562 1.563-1.562h.937a.625.625 0 1 0 0-1.25h-.937C12.7 24.5 12 23.8 12 22.938V18.25A6.25 6.25 0 0 1 18.25 12zm11.888 6.21a5.31 5.31 0 0 0-5.249 0l-7.303 4.152a5.31 5.31 0 0 0-2.686 4.618v8.585a5.31 5.31 0 0 0 2.65 4.596l7.302 4.228a5.31 5.31 0 0 0 5.322 0l7.303-4.228a5.31 5.31 0 0 0 2.65-4.596V26.98a5.31 5.31 0 0 0-2.687-4.618zm-8.334 9.795c.88 0 1.593.714 1.593 1.594v2.39a1.593 1.593 0 1 1-3.187 0v-2.39c0-.88.714-1.594 1.594-1.594m11.418 0c.88 0 1.594.714 1.594 1.594v2.39a1.594 1.594 0 0 1-3.187 0v-2.39c0-.88.713-1.594 1.593-1.594";
 
-export const LandingAvatarIcon = () => (
+export const ChevronDownIcon = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    width="64"
-    height="64"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden
+    className={className}
+  >
+    <path
+      d="M8 10L10.9393 12.9393C11.5251 13.5251 12.4749 13.5251 13.0607 12.9393L16 10"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const PlusIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden
+    className={className}
+  >
+    <path
+      d="M12 7V12M12 12V17M12 12H7M12 12H17"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+export const SignOutIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden
+    className={className}
+  >
+    <path
+      d="M15 4L17 4C18.6569 4 20 5.34315 20 7V17C20 18.6569 18.6569 20 17 20H15M14.5 12H4M14.5 12L11 15.5M14.5 12L11 8.5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const LandingAvatarIcon = ({ size = 64 }: { size?: number }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
     fill="none"
     viewBox="0 0 64 64"
     className="inline-block"

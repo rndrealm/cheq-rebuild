@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
+import { useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useConvexMutation } from "@/hooks/use-convex-mutation";
@@ -54,22 +56,30 @@ function ActionButton({
 
 export function BetActions({
   betId,
-  userId,
   canAccept,
+  canDecline,
   canCancel,
   canRematch,
 }: {
   betId: Id<"bets">;
-  userId: Id<"users">;
   canAccept: boolean;
+  canDecline: boolean;
   canCancel: boolean;
   canRematch: boolean;
 }) {
   const router = useRouter();
 
-  const { mutate: acceptBet, isPending: isAccepting } = useConvexMutation(
-    api.bets.accept,
-  );
+  // Accepting is an action: it fetches the start price before the bet starts.
+  const acceptBetAction = useAction(api.betActions.acceptBet);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const acceptBet = async (args: { betId: Id<"bets"> }) => {
+    setIsAccepting(true);
+    try {
+      await acceptBetAction(args);
+    } finally {
+      setIsAccepting(false);
+    }
+  };
   const { mutate: declineBet, isPending: isDeclining } = useConvexMutation(
     api.bets.decline,
   );
@@ -85,16 +95,16 @@ export function BetActions({
       {canAccept && (
         <ActionButton
           loading={isAccepting}
-          onClick={() => acceptBet({ betId, userId })}
+          onClick={() => acceptBet({ betId })}
         >
           Accept Challenge
         </ActionButton>
       )}
-      {canAccept && (
+      {canDecline && (
         <ActionButton
           variant="outline"
           loading={isDeclining}
-          onClick={() => declineBet({ betId, userId })}
+          onClick={() => declineBet({ betId })}
         >
           Decline
         </ActionButton>
@@ -103,7 +113,7 @@ export function BetActions({
         <ActionButton
           variant="destructive"
           loading={isCancelling}
-          onClick={() => cancelBet({ betId, userId })}
+          onClick={() => cancelBet({ betId })}
         >
           Cancel Bet
         </ActionButton>
@@ -112,7 +122,7 @@ export function BetActions({
         <ActionButton
           loading={isRematching}
           onClick={async () => {
-            const newBetId = await rematchBet({ betId, userId });
+            const newBetId = await rematchBet({ betId });
             if (newBetId) router.push(`/bet/${newBetId}`);
           }}
         >

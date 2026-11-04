@@ -65,6 +65,9 @@ export default function BetDetailPage() {
     !isCreator &&
     (bet.status === "pending" || bet.status === "countered") &&
     (!bet.opponentId || isOpponent);
+  // Only a named opponent can decline; open challenges can only be accepted.
+  const canDecline =
+    isOpponent && (bet.status === "pending" || bet.status === "countered");
   const canCancel =
     isCreator && (bet.status === "pending" || bet.status === "countered");
   const canRematch =
@@ -109,9 +112,10 @@ export default function BetDetailPage() {
         </p>
         <div className="flex flex-col gap-3">
           <InfoRow label={description.label} value={description.value} />
+          {/* Bets start on acceptance; until then the creation price is a preview. */}
           <InfoRow
-            label="Market Price"
-            value={`$${bet.priceAtCreation.toLocaleString(undefined, { maximumFractionDigits: 6 })}`}
+            label={bet.priceAtStart !== undefined ? "Start Price" : "Market Price"}
+            value={`$${(bet.priceAtStart ?? bet.priceAtCreation).toLocaleString(undefined, { maximumFractionDigits: 6 })}`}
           />
           <InfoRow
             label="Timeframe"
@@ -157,8 +161,8 @@ export default function BetDetailPage() {
 
       <BetActions
         betId={bet._id}
-        userId={user._id}
         canAccept={canAccept}
+        canDecline={canDecline}
         canCancel={canCancel}
         canRematch={canRematch}
       />

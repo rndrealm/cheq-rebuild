@@ -1,5 +1,6 @@
 "use node";
 
+// eslint-disable-next-line no-restricted-imports -- public market data, used logged-out
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
@@ -83,6 +84,67 @@ export const getChartData = action({
     });
 
     return result;
+  },
+});
+
+// Candle sizes for bet charts, smallest first. A bet's window gets the
+// smallest one that keeps it under MAX_BET_CHART_POINTS candles: 1h and 4h
+// bets get 1m candles, 24h gets 5m, 3d gets 15m, 1w gets 30m.
+const BET_CHART_INTERVALS: { interval: string; ms: number }[] = [
+  { interval: "1m", ms: 60_000 },
+  { interval: "3m", ms: 3 * 60_000 },
+  { interval: "5m", ms: 5 * 60_000 },
+  { interval: "15m", ms: 15 * 60_000 },
+  { interval: "30m", ms: 30 * 60_000 },
+  { interval: "1h", ms: 60 * 60_000 },
+  { interval: "2h", ms: 2 * 60 * 60_000 },
+];
+const MAX_BET_CHART_POINTS = 400;
+// Longest bet is 1w; allow some slack, but no arbitrary history requests.
+const MAX_BET_WINDOW_MS = 8 * 24 * 60 * 60_000;
+
+// Prices for one token across a bet's window, from `startTime` up to now (or
+// `endTime` if it has passed). The last close is the live price. Public market
+// data, like `getChartData`.
+export const getBetChart = action({
+  args: {
+    symbol: v.string(),
+    startTime: v.number(),
+    endTime: v.number(),
+  },
+  handler: async (
+    _ctx,
+    args,
+  ): Promise<{ times: number[]; closes: number[] } | null> => {
+    if (!SUPPORTED_SYMBOLS.has(args.symbol)) return null;
+    const windowMs = args.endTime - args.startTime;
+    if (windowMs <= 0 || windowMs > MAX_BET_WINDOW_MS) return null;
+
+    const now = Date.now();
+    const end = Math.min(now, args.endTime);
+    if (end <= args.startTime) return { times: [], closes: [] };
+
+    const { interval } =
+      BET_CHART_INTERVALS.find(
+        (c) => windowMs / c.ms <= MAX_BET_CHART_POINTS,
+      ) ?? BET_CHART_INTERVALS[BET_CHART_INTERVALS.length - 1];
+
+    const url = binanceApiUrl(
+      `/api/v3/klines?symbol=${toBinanceSymbol(args.symbol)}&interval=${interval}&startTime=${args.startTime}&endTime=${end}&limit=1000`,
+    );
+    const res = await fetch(url);
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (!Array.isArray(data)) return null;
+
+    // Kline rows: [openTime, open, high, low, close, ...]. The newest candle
+    // is still open, so its close is the current price; stamp it with `end`.
+    const times = data.map((c: [number, ...unknown[]]) => c[0]);
+    const closes = data.map((c: string[]) => parseFloat(c[4]));
+    if (times.length > 0) times[times.length - 1] = end;
+
+    return { times, closes };
   },
 });
 

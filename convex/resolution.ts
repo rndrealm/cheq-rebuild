@@ -4,6 +4,7 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { fetchPriceWithRetry, fetchPrice } from "./lib/prices";
+import { isTargetHit } from "./lib/touch";
 
 export const resolveSnapshot = internalAction({
   args: { betId: v.id("bets") },
@@ -74,31 +75,21 @@ export const pollTouchBets = internalAction({
   handler: async (ctx) => {
     const activeTouchBets = await ctx.runQuery(
       internal.resolutionHelpers.getActiveTouchBets,
+      { now: Date.now() },
     );
 
     for (const bet of activeTouchBets) {
       const result = await fetchPrice(bet.token.symbol);
       if (result.price === null) continue;
+      if (!isTargetHit(bet.betTerms, result.price)) continue;
 
-      const targetPrice = bet.betTerms.targetPrice;
-      if (targetPrice === undefined) continue;
-
-      const hit = result.price >= targetPrice;
-
-      if (hit) {
-        await ctx.runMutation(internal.resolutionHelpers.settleTouch, {
-          betId: bet._id,
-          priceAtResolution: result.price,
-          priceSource: result.source,
-        });
-        if (bet.opponentId) {
-          await ctx.runMutation(internal.progression.awardBetXp, {
-            winnerId: bet.creatorId,
-            loserId: bet.opponentId,
-            betId: bet._id,
-          });
-        }
-      }
+      // settleTouch re-checks status, deadline and hit, and awards XP in the
+      // same transaction, so overlapping runs can't double-settle.
+      await ctx.runMutation(internal.resolutionHelpers.settleTouch, {
+        betId: bet._id,
+        priceAtResolution: result.price,
+        priceSource: result.source,
+      });
     }
 
     return null;

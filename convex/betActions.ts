@@ -1,10 +1,11 @@
 "use node";
 
-import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+import { authedAction } from "./lib/functions";
 import { fetchPrice } from "./lib/prices";
+import { SUPPORTED_SYMBOLS } from "./lib/tokens";
 
 const tokenValidator = v.object({
   symbol: v.string(),
@@ -24,9 +25,8 @@ const durationValidator = v.union(
   v.literal("1w"),
 );
 
-export const createBet = action({
+export const createBet = authedAction({
   args: {
-    creatorId: v.id("users"),
     opponentId: v.optional(v.id("users")),
     type: betTypeValidator,
     token: tokenValidator,
@@ -43,6 +43,12 @@ export const createBet = action({
   },
   returns: v.id("bets"),
   handler: async (ctx, args) => {
+    for (const token of [args.token, args.tokenB]) {
+      if (token && !SUPPORTED_SYMBOLS.has(token.symbol)) {
+        throw new Error(`${token.symbol} is not supported`);
+      }
+    }
+
     console.log(`[createBet] Fetching price for ${args.token.symbol}`);
     const priceResult = await fetchPrice(args.token.symbol);
     if (priceResult.price === null) {
@@ -71,9 +77,46 @@ export const createBet = action({
 
     const betId: Id<"bets"> = await ctx.runMutation(internal.bets.create, {
       ...args,
+      creatorId: ctx.user._id,
       priceAtCreation: priceResult.price,
       priceAtCreationB,
     });
     return betId;
   },
 });
+
+// The bet starts on acceptance: fetch the start price(s) here, then the
+// internal mutation runs the checks, locks the wager and starts the clock.
+export const acceptBet = authedAction({
+  args: { betId: v.id("bets") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const bet: Doc<"bets"> | null = await ctx.runQuery(
+      internal.resolutionHelpers.getBet,
+      { betId: args.betId },
+    );
+    if (!bet) throw new Error("Bet not found");
+
+    const priceAtStart = await requirePrice(bet.token.symbol);
+    const priceAtStartB =
+      bet.type === "token_vs_token" && bet.tokenB
+        ? await requirePrice(bet.tokenB.symbol)
+        : undefined;
+
+    await ctx.runMutation(internal.bets.accept, {
+      betId: args.betId,
+      userId: ctx.user._id,
+      priceAtStart,
+      priceAtStartB,
+    });
+    return null;
+  },
+});
+
+async function requirePrice(symbol: string): Promise<number> {
+  const result = await fetchPrice(symbol);
+  if (result.price === null) {
+    throw new Error(`Could not fetch price for ${symbol}. Try again.`);
+  }
+  return result.price;
+}

@@ -9,6 +9,12 @@ crons.interval(
   internal.resolution.pollTouchBets,
 );
 
+crons.interval(
+  "record bet checkpoints",
+  { seconds: 30 },
+  internal.checkpoints.poll,
+);
+
 crons.cron(
   "weekly topup",
   "0 0 * * 1",
