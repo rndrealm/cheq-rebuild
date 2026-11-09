@@ -349,15 +349,4 @@ describe("recordCheckpoints", () => {
 
     expect(await t.query(api.checkpoints.recentFeed, {})).toEqual([]);
   });
-
-  test("liveSymbols lists tokens of active, unexpired bets", async () => {
-    const t = convexTest({ schema, modules });
-    await seed(t);
-    expect(
-      await t.query(internal.checkpoints.liveSymbols, { now: START }),
-    ).toEqual(["BTC"]);
-    expect(
-      await t.query(internal.checkpoints.liveSymbols, { now: START + HOUR }),
-    ).toEqual([]);
-  });
 });

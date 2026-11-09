@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useAction } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { useMarket } from "@/hooks/use-market";
 import Image from "next/image";
 import { RemoteImage } from "@/components/ui/remote-image";
 import { CoinImage } from "@/components/ui/coin-image";
@@ -13,14 +12,12 @@ import {
   getTokenName,
 } from "@/lib/constants/tokens";
 import { formatPrice } from "@/lib/helpers/format";
-import { WipeReveal } from "@/components/ui/wipe-reveal";
 
 export type TokenValue = {
   symbol: string;
 };
 
 type TokenPriceData = { price: number; priceChange24h: number };
-type PriceMap = Record<string, TokenPriceData>;
 
 const TOKEN_FALLBACK = "/media/token-placeholder.svg";
 
@@ -89,30 +86,6 @@ function TokenRow({
   );
 }
 
-// DEMO: fake loading delay for initial list and search — remove before launch
-const FAKE_INITIAL_DELAY = 800;
-const FAKE_SEARCH_DELAY = 400;
-const SKELETON_ROW_COUNT = 6;
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-1.5 rounded-[10px] px-2 py-2.25"
-        >
-          <span className="size-5 shrink-0 animate-pulse rounded-full bg-bg-300" />
-          <div className="flex flex-1 items-center justify-between">
-            <span className="h-3.5 w-24 animate-pulse rounded bg-bg-300" />
-            <span className="h-3.5 w-20 animate-pulse rounded bg-bg-300" />
-          </div>
-        </div>
-      ))}
-    </>
-  );
-}
-
 export function TokenCombobox({
   value,
   onSelect,
@@ -132,60 +105,13 @@ export function TokenCombobox({
 }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [prices, setPrices] = React.useState<PriceMap>({});
-  // DEMO: fake loading states — remove before launch
-  const [initialLoading, setInitialLoading] = React.useState(false);
-  const [searchLoading, setSearchLoading] = React.useState(false);
 
-  const getAllPrices = useAction(api.tokens.getAllPrices);
-  const fetchedRef = React.useRef(false);
+  // Live prices for the list; the token list itself is static.
+  const market = useMarket();
 
   const inputRef = React.useRef<HTMLInputElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  // DEMO: wait for both fake delay AND prices before revealing — remove before launch
-  React.useEffect(() => {
-    if (open && !fetchedRef.current) {
-      fetchedRef.current = true;
-      setInitialLoading(true);
-      let timerDone = false;
-      let pricesDone = false;
-      const tryReveal = () => {
-        if (timerDone && pricesDone) setInitialLoading(false);
-      };
-      const timer = setTimeout(() => {
-        timerDone = true;
-        tryReveal();
-      }, FAKE_INITIAL_DELAY);
-      getAllPrices({})
-        .then((p) => {
-          setPrices(p);
-          pricesDone = true;
-          tryReveal();
-        })
-        .catch(() => {
-          pricesDone = true;
-          tryReveal();
-        });
-      return () => clearTimeout(timer);
-    }
-  }, [open, getAllPrices]);
-
-  // DEMO: fake search loading — remove before launch
-  const searchTimerRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
-  const handleQueryChange = React.useCallback((val: string) => {
-    setQuery(val);
-    clearTimeout(searchTimerRef.current);
-    if (val) {
-      setSearchLoading(true);
-      searchTimerRef.current = setTimeout(
-        () => setSearchLoading(false),
-        FAKE_SEARCH_DELAY,
-      );
-    } else {
-      setSearchLoading(false);
-    }
-  }, []);
 
   React.useEffect(() => {
     if (open) {
@@ -250,7 +176,7 @@ export function TokenCombobox({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tokens"
             className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-caption placeholder:text-[#C2C2C2]"
             onKeyDown={(e) => {
@@ -294,35 +220,22 @@ export function TokenCombobox({
             dropdownClassName,
           )}
         >
-          {/* DEMO: search loading bar — remove before launch */}
-          {searchLoading && (
-            <div className="h-0.5 w-full overflow-hidden bg-[#E8E8FF]">
-              <div className="h-full w-1/3 animate-[slide_1s_ease-in-out_infinite] bg-[#9391F7]" />
-            </div>
-          )}
           <div className="max-h-48.5 overflow-y-auto p-2">
-            {/* DEMO: WipeReveal skeleton transition — remove before launch */}
-            <WipeReveal
-              revealed={!initialLoading && !searchLoading}
-              skeleton={<SkeletonRows />}
-              className="bg-white"
-            >
-              {filtered.length === 0 ? (
-                <div className="py-6 text-center text-sm text-fg-400">
-                  No tokens found.
-                </div>
-              ) : (
-                filtered.map((symbol) => (
-                  <TokenRow
-                    key={symbol}
-                    symbol={symbol}
-                    selected={value?.symbol === symbol}
-                    onSelect={() => selectToken(symbol)}
-                    priceData={prices[symbol]}
-                  />
-                ))
-              )}
-            </WipeReveal>
+            {filtered.length === 0 ? (
+              <div className="py-6 text-center text-sm text-fg-400">
+                No tokens found.
+              </div>
+            ) : (
+              filtered.map((symbol) => (
+                <TokenRow
+                  key={symbol}
+                  symbol={symbol}
+                  selected={value?.symbol === symbol}
+                  onSelect={() => selectToken(symbol)}
+                  priceData={market?.get(symbol)}
+                />
+              ))
+            )}
           </div>
         </div>
       )}

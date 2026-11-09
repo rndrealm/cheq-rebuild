@@ -2,39 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useAction } from "convex/react";
-import { api } from "../../../convex/_generated/api";
 import { RemoteImage } from "@/components/ui/remote-image";
+import { useMarket } from "@/hooks/use-market";
 import mainAssets from "@/lib/assets";
 import { getTokenImage } from "@/lib/constants/tokens";
 import { cn } from "@/lib/utils";
 
 const ROTATE_MS = 4000;
-const REFRESH_MS = 60_000;
 const ICONS_PER_LINE = 3;
 
-// DEMO: sample stock data. We have no stocks feed yet.
-const SAMPLE_STOCKS = [
-  { ticker: "NVDA", change: 2.14 },
-  { ticker: "AAPL", change: 0.82 },
-  { ticker: "TSLA", change: -1.37 },
-];
-const SAMPLE_INDEX_CHANGE = 0.64;
-
-// DEMO: shown only if live token prices can't be loaded.
-const SAMPLE_TOKENS: TokenMove[] = [
-  { symbol: "NEAR", change: 7.9 },
-  { symbol: "SOL", change: 3.2 },
-  { symbol: "ETH", change: 1.1 },
-  { symbol: "BTC", change: -0.8 },
-  { symbol: "ARB", change: -2.4 },
-];
+// Moves are Binance's rolling 24h change, and "Crypto" is the plain average
+// of our 24 tokens. Shown to one decimal, so anything smaller reads as no move.
+const FLAT_THRESHOLD = 0.05;
 
 type TokenMove = { symbol: string; change: number };
 
 type Line = {
   key: string;
-  // Token symbols to show logos for. Stocks have no logos, so they show none.
+  // Token symbols to show logos for.
   icons: string[];
   before: string;
   value: string;
@@ -56,107 +41,78 @@ function buildLines(tokens: TokenMove[]): Line[] {
   const average =
     tokens.reduce((sum, token) => sum + token.change, 0) / tokens.length;
   const up = tokens.filter((token) => token.change > 0);
-  const stocks = [...SAMPLE_STOCKS].sort((a, b) => b.change - a.change);
-  const topStock = stocks[0];
+  const lines: Line[] = [];
 
-  return [
-    {
-      key: "market",
-      icons: tokenIcons(sorted),
-      before: "The market moved ",
-      value: signed(average),
-      after: " today.",
-      change: average,
-    },
-    {
+  lines.push(
+    Math.abs(average) < FLAT_THRESHOLD
+      ? {
+          key: "market",
+          icons: tokenIcons(sorted),
+          before: "Crypto is ",
+          value: "flat",
+          after: " over 24h.",
+        }
+      : {
+          key: "market",
+          icons: tokenIcons(sorted),
+          before: "Crypto moved ",
+          value: signed(average),
+          after: " in 24h.",
+          change: average,
+        },
+  );
+
+  // Only when something is actually up.
+  if (best.change >= FLAT_THRESHOLD) {
+    lines.push({
       key: "leader",
       icons: [best.symbol],
-      before: `${best.symbol} leads today at `,
+      before: `${best.symbol} leads at `,
       value: signed(best.change),
-      after: ".",
+      after: " in 24h.",
       change: best.change,
-    },
-    {
-      key: "breadth",
-      icons: tokenIcons(up.length > 0 ? up : sorted),
-      before: "",
-      value: `${up.length} of ${tokens.length}`,
-      after: " tokens are up today.",
-    },
-    {
+    });
+  }
+
+  lines.push({
+    key: "breadth",
+    icons: tokenIcons(up.length > 0 ? up : sorted),
+    before: "",
+    value: `${up.length} of ${tokens.length}`,
+    after: " tokens are up in 24h.",
+  });
+
+  // Only when something is actually down.
+  if (worst.change <= -FLAT_THRESHOLD) {
+    lines.push({
       key: "laggard",
       icons: [worst.symbol],
       before: `${worst.symbol} is the biggest mover down at `,
       value: signed(worst.change),
-      after: ".",
+      after: " in 24h.",
       change: worst.change,
-    },
-    {
-      key: "stocks",
-      icons: [],
-      before: "Stocks are ",
-      value: signed(SAMPLE_INDEX_CHANGE),
-      after: " on the S&P 500.",
-      change: SAMPLE_INDEX_CHANGE,
-    },
-    {
-      key: "top-stock",
-      icons: [],
-      before: `${topStock.ticker} leads stocks at `,
-      value: signed(topStock.change),
-      after: ".",
-      change: topStock.change,
-    },
-  ];
+    });
+  }
+
+  return lines;
 }
 
-// Survive Home remounting on page transitions, so the ticker shows straight
-// away on the same line instead of disappearing until prices reload.
-let lastTokens: TokenMove[] | null = null;
+// Keeps the rotation where it was when Home remounts on a page transition.
 let lastTick = 0;
 
-function useTokenMoves(): TokenMove[] | null {
-  const getAllPrices = useAction(api.tokens.getAllPrices);
-  const [tokens, setTokens] = useState<TokenMove[] | null>(lastTokens);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const prices = await getAllPrices();
-        const moves = Object.entries(prices).map(([symbol, price]) => ({
-          symbol,
-          change: price.priceChange24h,
-        }));
-        if (cancelled) return;
-        // Keep what's showing if a refresh comes back empty.
-        lastTokens = moves.length > 0 ? moves : (lastTokens ?? SAMPLE_TOKENS);
-        setTokens(lastTokens);
-      } catch {
-        if (cancelled) return;
-        lastTokens = lastTokens ?? SAMPLE_TOKENS;
-        setTokens(lastTokens);
-      }
-    }
-
-    void load();
-    const id = setInterval(load, REFRESH_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [getAllPrices]);
-
-  return tokens;
-}
-
-/** Header market ticker: rotates through token and stock highlights. */
+/** Header market ticker: rotates through highlights of our tokens' 24h moves. */
 export function MarketMove() {
-  const tokens = useTokenMoves();
+  const market = useMarket();
   const reducedMotion = useReducedMotion();
   const [tick, setTick] = useState(lastTick);
-  const lines = useMemo(() => (tokens ? buildLines(tokens) : null), [tokens]);
+  const lines = useMemo(() => {
+    if (!market || market.size === 0) return null;
+    const moves = [...market.values()].map(({ symbol, priceChange24h }) => ({
+      symbol,
+      change: priceChange24h,
+    }));
+    return buildLines(moves);
+  }, [market]);
 
   useEffect(() => {
     const id = setInterval(() => {

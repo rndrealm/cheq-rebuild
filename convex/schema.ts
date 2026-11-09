@@ -127,6 +127,20 @@ export default defineSchema({
     .index("by_betId_and_key", ["betId", "key"])
     .index("by_at", ["at"]),
 
+  // Latest price and 24h stats per supported token, from Binance. One row per
+  // token, overwritten by the checkpoint poller every 30s (see market.ts).
+  marketPrices: defineTable({
+    symbol: v.string(),
+    price: v.number(),
+    priceChange24h: v.number(),
+    priceChangeAbs24h: v.number(),
+    open24h: v.number(),
+    high24h: v.number(),
+    low24h: v.number(),
+    volume: v.number(),
+    updatedAt: v.number(),
+  }).index("by_symbol", ["symbol"]),
+
   rivalries: defineTable({
     userAId: v.id("users"),
     userBId: v.id("users"),

@@ -1,10 +1,9 @@
-// Checkpoint poller: every 30s (see crons.ts) prices every token with a live
-// bet and records new checkpoints in `betEvents`. Detection rules live in
-// lib/checkpoints.ts.
+// Checkpoint poller: every 30s (see crons.ts) fetches market data for every
+// supported token, saves it (market.ts) and records new checkpoints in
+// `betEvents`. Detection rules live in lib/checkpoints.ts.
 import {
   internalAction,
   internalMutation,
-  internalQuery,
   type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -12,7 +11,8 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { detectCheckpoints } from "./lib/checkpoints";
 import { optionalAuthQuery } from "./lib/functions";
-import { fetchPrices } from "./lib/prices";
+import { SUPPORTED_TOKENS } from "./lib/constants";
+import { fetchMarketTickers } from "./lib/market";
 
 // Upper bound on live bets processed per run. Well above today's volume; if
 // it's ever reached, the bets ending soonest are processed first.
@@ -92,20 +92,6 @@ export const recentFeed = optionalAuthQuery({
   },
 });
 
-// Tokens that need a price this run.
-export const liveSymbols = internalQuery({
-  args: { now: v.number() },
-  returns: v.array(v.string()),
-  handler: async (ctx, args) => {
-    const symbols = new Set<string>();
-    for (const bet of await liveBets(ctx, args.now)) {
-      symbols.add(bet.token.symbol);
-      if (bet.tokenB) symbols.add(bet.tokenB.symbol);
-    }
-    return [...symbols];
-  },
-});
-
 // Records new checkpoints for every live bet at these prices. Re-reads each
 // bet and its events in this transaction, so overlapping runs can't record a
 // checkpoint twice. Bets whose token(s) have no price this run are skipped.
@@ -144,19 +130,21 @@ export const recordCheckpoints = internalMutation({
   },
 });
 
+// Every 30s: one Binance call for all supported tokens. Saves the market
+// snapshot the app reads, then records checkpoints for live bets at those
+// prices.
 export const poll = internalAction({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    const symbols: string[] = await ctx.runQuery(
-      internal.checkpoints.liveSymbols,
-      { now: Date.now() },
+    const tickers = await fetchMarketTickers(SUPPORTED_TOKENS);
+    if (tickers.length === 0) return null;
+
+    await ctx.runMutation(internal.market.saveSnapshot, { tickers });
+
+    const prices = Object.fromEntries(
+      tickers.map((ticker) => [ticker.symbol, ticker.price]),
     );
-    if (symbols.length === 0) return null;
-
-    const prices = await fetchPrices(symbols);
-    if (Object.keys(prices).length === 0) return null;
-
     await ctx.runMutation(internal.checkpoints.recordCheckpoints, { prices });
     return null;
   },

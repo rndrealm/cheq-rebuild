@@ -7,7 +7,7 @@ import { ChartTooltip } from "@/components/token-card/chart-tooltip";
 import { useChartInteraction } from "@/hooks/use-chart-interaction";
 import { useTilt } from "@/hooks/use-tilt";
 import { useTokenChart } from "@/hooks/use-token-chart";
-import { useTokenStats, type TokenStats } from "@/hooks/use-token-stats";
+import { useTokenStats, type TokenStats } from "@/hooks/use-market";
 import mainAssets from "@/lib/assets";
 import { getTokenImage, getTokenName } from "@/lib/constants/tokens";
 import { formatPrice } from "@/lib/helpers/format";

@@ -16,6 +16,9 @@ export default function MainLayout({
   // Keeps your bets subscribed on Home, so the Feed carousel is ready the
   // moment the transition starts instead of arriving as a skeleton.
   useQuery(api.bets.feedForUser, { userId: user._id });
+  // Same for market prices, so the ticker and chart stats are there the
+  // moment Home remounts.
+  useQuery(api.market.snapshot);
 
   return (
     <div className="relative flex flex-1 bg-card">

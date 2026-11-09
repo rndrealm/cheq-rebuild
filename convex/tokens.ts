@@ -10,6 +10,8 @@ import {
   fetchBinance,
   toBinanceSymbol,
 } from "./lib/tokens";
+import { SUPPORTED_TOKENS } from "./lib/constants";
+import { fetchMarketTickers } from "./lib/market";
 
 const INTERVAL_CONFIG: Record<
   string,
@@ -179,36 +181,16 @@ export const getPrice = action({
   },
 });
 
+// Only the demo token picker still calls this; the app reads market.snapshot.
 export const getAllPrices = action({
   args: {},
   handler: async () => {
-    const res = await fetchBinance(binanceApiUrl("/api/v3/ticker/24hr"));
-    if (!res?.ok) return {};
-
-    const data: Array<{
-      symbol: string;
-      lastPrice: string;
-      priceChangePercent: string;
-    }> = await res.json();
-
-    const usdtSuffix = "USDT";
-    const prices: Record<
-      string,
-      { price: number; priceChange24h: number }
-    > = {};
-
-    for (const ticker of data) {
-      if (!ticker.symbol.endsWith(usdtSuffix)) continue;
-      const base = ticker.symbol.slice(0, -usdtSuffix.length);
-      if (!SUPPORTED_SYMBOLS.has(base)) continue;
-      const price = parseFloat(ticker.lastPrice);
-      if (isNaN(price)) continue;
-      prices[base] = {
-        price,
-        priceChange24h: parseFloat(ticker.priceChangePercent) || 0,
-      };
+    const tickers = await fetchMarketTickers(SUPPORTED_TOKENS);
+    const prices: Record<string, { price: number; priceChange24h: number }> =
+      {};
+    for (const { symbol, price, priceChange24h } of tickers) {
+      prices[symbol] = { price, priceChange24h };
     }
-
     return prices;
   },
 });
