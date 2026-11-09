@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
-import { Avatar } from "@/components/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,48 +11,48 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@/components/providers/user-provider";
-import { EXPRESSIONS, COLORS } from "@/lib/avatar-shapes";
 import { AppRoutes } from "@/lib/routes";
 import {
   BetsIcon,
   HomeIcon,
   LandingAvatarIcon,
-  PlusIcon,
+  SettingsIcon,
   SignOutIcon,
 } from "@/lib/svgs";
-import { cn, simpleHash } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const NAV_ITEMS: {
   label: string;
   href: string;
   icon: (props: { className?: string }) => React.ReactNode;
 }[] = [
-  { label: "Dashboard", href: AppRoutes.home.path, icon: HomeIcon },
+  { label: "Home", href: AppRoutes.home.path, icon: HomeIcon },
   { label: "Bets", href: AppRoutes.feed.path, icon: BetsIcon },
-  { label: "New bet", href: AppRoutes.createBet.path, icon: PlusIcon },
 ];
 
 const TILE_CLASS =
-  "flex items-center justify-center outline-none transition-[background-color,color,scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.96]";
+  "flex size-9 items-center justify-center rounded-lg text-gray-12 outline-none transition-[background-color,scale] duration-150 ease-out hover:bg-gray-3 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.96]";
 
-/** Left-hand icon rail: logo, page nav, new bet, and the account menu. */
+/** Left-hand icon rail: logo, page nav, and settings (the account menu). */
 export function AppSidebar() {
   const user = useUser();
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 z-40 flex h-dvh w-20 shrink-0 flex-col items-center bg-gray-3 py-6">
+    <aside
+      className="sticky top-0 z-40 flex h-dvh w-14 shrink-0 flex-col items-center bg-card py-8.5"
+      // Holds still during page transitions (see globals.css)
+      style={{ viewTransitionName: "app-sidebar" }}
+    >
       <Link
         href={AppRoutes.home.path}
         aria-label="cheq home"
-        className="flex size-12 items-center justify-center"
+        className="flex size-9 items-center justify-center"
       >
-        <LandingAvatarIcon size={32} />
+        <LandingAvatarIcon size={36} />
       </Link>
 
-      {/* mt-22 puts the Home tile's top level with the dashboard's cards:
-          pt-6 + 48px title row + mb-10 + h-9 heading row + gap-3 = 160px. */}
-      <nav className="mt-22 flex flex-col items-center gap-3">
+      <nav className="mt-[47px] flex flex-col items-center gap-1">
         {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
           const active = pathname === href;
           return (
@@ -63,13 +62,7 @@ export function AppSidebar() {
               aria-label={label}
               title={label}
               aria-current={active ? "page" : undefined}
-              className={cn(
-                TILE_CLASS,
-                "h-9 w-[38px] rounded-[10px]",
-                active
-                  ? "bg-gray-5 text-fg-base"
-                  : "text-gray-11 hover:bg-gray-4 hover:text-fg-base",
-              )}
+              className={cn(TILE_CLASS, active && "bg-gray-3")}
             >
               <Icon className="size-4.5" />
             </Link>
@@ -80,17 +73,11 @@ export function AppSidebar() {
       <div className="mt-auto">
         <DropdownMenu>
           <DropdownMenuTrigger
-            aria-label="Account menu"
-            className={cn(
-              TILE_CLASS,
-              "size-12 cursor-pointer rounded-[14px] bg-gray-4 hover:bg-gray-5",
-            )}
+            aria-label="Settings"
+            title="Settings"
+            className={cn(TILE_CLASS, "cursor-pointer")}
           >
-            <Avatar
-              expressionIndex={simpleHash(user._id) % EXPRESSIONS.length}
-              colorIndex={simpleHash(user._id + "c") % COLORS.length}
-              size={32}
-            />
+            <SettingsIcon className="size-4.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             side="right"

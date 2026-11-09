@@ -7,6 +7,7 @@ import { v } from "convex/values";
 import {
   SUPPORTED_SYMBOLS,
   binanceApiUrl,
+  fetchBinance,
   toBinanceSymbol,
 } from "./lib/tokens";
 
@@ -17,6 +18,7 @@ const INTERVAL_CONFIG: Record<
   "1D": { interval: "1h", limit: 24 },
   "1W": { interval: "4h", limit: 42 },
   "1M": { interval: "1d", limit: 30 },
+  "6M": { interval: "1d", limit: 180 },
   "1Y": { interval: "1d", limit: 365 },
   YTD: { interval: "1d", limit: 0 },
   All: { interval: "1w", limit: 200 },
@@ -63,8 +65,8 @@ export const getChartData = action({
     const url = binanceApiUrl(
       `/api/v3/klines?symbol=${toBinanceSymbol(args.symbol)}&interval=${config.interval}&limit=${limit}`,
     );
-    const res = await fetch(url);
-    if (!res.ok) return null;
+    const res = await fetchBinance(url);
+    if (!res?.ok) return null;
 
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) return null;
@@ -132,8 +134,8 @@ export const getBetChart = action({
     const url = binanceApiUrl(
       `/api/v3/klines?symbol=${toBinanceSymbol(args.symbol)}&interval=${interval}&startTime=${args.startTime}&endTime=${end}&limit=1000`,
     );
-    const res = await fetch(url);
-    if (!res.ok) return null;
+    const res = await fetchBinance(url);
+    if (!res?.ok) return null;
 
     const data = await res.json();
     if (!Array.isArray(data)) return null;
@@ -153,12 +155,12 @@ export const getPrice = action({
   handler: async (_ctx, args) => {
     if (!SUPPORTED_SYMBOLS.has(args.symbol)) return null;
 
-    const res = await fetch(
+    const res = await fetchBinance(
       binanceApiUrl(
         `/api/v3/ticker/24hr?symbol=${toBinanceSymbol(args.symbol)}`,
       ),
     );
-    if (!res.ok) return null;
+    if (!res?.ok) return null;
 
     const data = await res.json();
     const price = parseFloat(data.lastPrice);
@@ -167,6 +169,10 @@ export const getPrice = action({
     return {
       price,
       priceChange24h: parseFloat(data.priceChangePercent) || 0,
+      priceChangeAbs24h: parseFloat(data.priceChange) || 0,
+      open24h: parseFloat(data.openPrice) || 0,
+      high24h: parseFloat(data.highPrice) || 0,
+      low24h: parseFloat(data.lowPrice) || 0,
       volume: parseFloat(data.quoteVolume) || 0,
       symbol: args.symbol,
     };
@@ -176,8 +182,8 @@ export const getPrice = action({
 export const getAllPrices = action({
   args: {},
   handler: async () => {
-    const res = await fetch(binanceApiUrl("/api/v3/ticker/24hr"));
-    if (!res.ok) return {};
+    const res = await fetchBinance(binanceApiUrl("/api/v3/ticker/24hr"));
+    if (!res?.ok) return {};
 
     const data: Array<{
       symbol: string;

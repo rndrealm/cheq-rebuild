@@ -5,10 +5,9 @@ import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import { RemoteImage } from "@/components/ui/remote-image";
-import { Avatar } from "@/components/avatar";
-import { EXPRESSIONS, COLORS } from "@/lib/avatar-shapes";
+import { BetAvatar } from "@/components/bet-avatar";
 import { getTokenImage, getTokenName } from "@/lib/constants/tokens";
-import { cn, simpleHash } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/helpers/format";
 import {
   getStatusConfig,
@@ -161,11 +160,7 @@ export function TokenCard({
                 {/* Avatar + Name */}
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col gap-3">
-                    <Avatar
-                      expressionIndex={simpleHash(bet.creatorId) % EXPRESSIONS.length}
-                      colorIndex={simpleHash(bet.creatorId + "c") % COLORS.length}
-                      size={48}
-                    />
+                    <BetAvatar seed={bet.creatorId} />
                     <div className="flex flex-col gap-1">
                       <span className="text-sm font-semibold leading-5 text-fg-base">
                         {creatorName}

@@ -120,6 +120,7 @@ export function TokenCombobox({
   placeholder = "Search token...",
   triggerClassName,
   triggerStyle,
+  dropdownClassName,
 }: {
   value: TokenValue | null;
   onSelect: (token: TokenValue | null) => void;
@@ -127,6 +128,7 @@ export function TokenCombobox({
   placeholder?: string;
   triggerClassName?: string;
   triggerStyle?: React.CSSProperties;
+  dropdownClassName?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -286,7 +288,12 @@ export function TokenCombobox({
       )}
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-[281px] overflow-hidden rounded-[10px] bg-white shadow-[0_0_0_1px_#0000000A,0_4px_14px_0_#00000014]">
+        <div
+          className={cn(
+            "absolute left-0 top-full z-50 mt-2 w-[281px] overflow-hidden rounded-[10px] bg-white shadow-[0_0_0_1px_#0000000A,0_4px_14px_0_#00000014]",
+            dropdownClassName,
+          )}
+        >
           {/* DEMO: search loading bar — remove before launch */}
           {searchLoading && (
             <div className="h-0.5 w-full overflow-hidden bg-[#E8E8FF]">

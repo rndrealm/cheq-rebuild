@@ -83,6 +83,13 @@ const DIRECTION_OPTIONS_MAP: Record<string, DropdownSelectOption[]> = {
   ],
 };
 
+// Convex wraps server errors as "[CONVEX ...] Uncaught Error: <message> at ...".
+function getErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  const match = message.match(/(?:Uncaught Error: )+(.+?)(?:\n|\s+at |$)/);
+  return match?.[1] ?? "Couldn't open this position. Please try again.";
+}
+
 const tokenSchema = z.object({
   symbol: z.string(),
 });
@@ -104,25 +111,46 @@ const createBetSchema = z.object({
 /**
  * The "open a bet" form: token, bet type, terms, duration and wager, ending
  * in the "Position Opened" reveal. Used by the create-bet page and the
- * dashboard's empty Live bets widget.
+ * dashboard's empty Live bets widget. `variant="panel"` is the home page's
+ * always-visible form: fields in a grey box, button and disclaimer below, and
+ * it stays usable after a bet is opened.
  */
 export function CreateBetForm({
   onCreated,
   className,
+  variant = "card",
+  defaultToken = "BTC",
+  onTokenChange,
 }: {
   /** Runs once the success reveal has played. */
   onCreated?: () => void;
   className?: string;
+  variant?: "card" | "panel";
+  defaultToken?: string;
+  onTokenChange?: (symbol: string) => void;
 }) {
+  const panel = variant === "panel";
+  const labelClass = panel
+    ? "text-caption font-medium leading-4 text-[#111]"
+    : "text-caption font-semibold text-fg-base";
+  const subLabelClass = panel
+    ? labelClass
+    : "text-xs font-semibold text-fg-base";
+  const inputClass = cn(
+    "w-32 rounded-[10px] bg-[#f3f3f3] h-9.5 pl-2.75 pr-2 text-xs font-medium text-[#111] outline-none placeholder:text-[#111]",
+    panel && "text-caption",
+  );
+
   const user = useUser();
   const createBet = useAction(api.betActions.createBet);
   const [isPending, setIsPending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
       token: {
-        symbol: "BTC",
+        symbol: defaultToken,
       } as TokenValue | null,
       type: "up_down" as "up_down" | "hit_price" | "token_vs_token",
       direction: "up" as "up" | "down",
@@ -154,6 +182,7 @@ export function CreateBetForm({
       }
 
       setIsPending(true);
+      setSubmitError(null);
       try {
         await createBet({
           type: value.type,
@@ -167,7 +196,13 @@ export function CreateBetForm({
           duration: value.duration,
         });
         setIsSuccess(true);
-        setTimeout(() => onCreated?.(), CREATED_DELAY_MS);
+        setTimeout(() => {
+          onCreated?.();
+          // The panel stays on screen, ready for the next bet.
+          if (panel) setIsSuccess(false);
+        }, CREATED_DELAY_MS);
+      } catch (error) {
+        setSubmitError(getErrorMessage(error));
       } finally {
         setIsPending(false);
       }
@@ -181,13 +216,28 @@ export function CreateBetForm({
         form.handleSubmit();
       }}
       className={cn(
-        "flex flex-col gap-4 rounded-[20px] bg-white px-7.5 pb-7 pt-5.5",
+        panel
+          ? "flex flex-col gap-4 rounded-xl bg-card p-2.5 font-display"
+          : "flex flex-col gap-4 rounded-[20px] bg-white px-7.5 pb-7 pt-5.5",
         className,
       )}
-      style={{
-        boxShadow: "0px 0px 0px 0.5px #0000000A, 0px 4px 24px 0px #0000000F",
-      }}
+      style={
+        panel
+          ? undefined
+          : {
+              boxShadow:
+                "0px 0px 0px 0.5px #0000000A, 0px 4px 24px 0px #0000000F",
+            }
+      }
     >
+      {/* The card variant lays these out directly in the form. */}
+      <div
+        className={
+          panel
+            ? "flex flex-col gap-4 rounded-[2px] bg-gray-2 px-7.5 pt-5.5 pb-7"
+            : "contents"
+        }
+      >
       <div className="flex flex-col">
         {/* Token */}
         <form.Field
@@ -199,15 +249,19 @@ export function CreateBetForm({
           {(field) => (
             <div className="pb-4">
               <div className="flex items-center justify-between">
-                <span className="text-caption font-semibold text-fg-base">
+                <span className={labelClass}>
                   Token
                 </span>
                 <TokenCombobox
                   value={field.state.value}
-                  onSelect={(token) => field.handleChange(token)}
+                  onSelect={(token) => {
+                    field.handleChange(token);
+                    if (token) onTokenChange?.(token.symbol);
+                  }}
                   onBlur={field.handleBlur}
                   placeholder="Select token"
                   triggerClassName="h-auto w-32 rounded-[10px] border-0 bg-[#f3f3f3] h-9.5  px-2 text-xs"
+                  dropdownClassName={panel ? "left-auto right-0" : undefined}
                 />
               </div>
               <FieldError field={field} />
@@ -219,7 +273,7 @@ export function CreateBetForm({
         <form.Field name="type">
           {(field) => (
             <div className="flex items-center justify-between pb-4">
-              <span className="text-caption font-semibold text-fg-base">
+              <span className={labelClass}>
                 Bet Type
               </span>
               <DropdownSelect
@@ -244,7 +298,7 @@ export function CreateBetForm({
                 <form.Field name="direction">
                   {(field) => (
                     <div className="flex items-center justify-between pb-4">
-                      <span className="text-caption font-semibold text-fg-base">
+                      <span className={labelClass}>
                         Direction
                       </span>
                       <DropdownSelect
@@ -268,7 +322,7 @@ export function CreateBetForm({
                   {(field) => (
                     <div className="pb-4">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-fg-base">
+                        <span className={subLabelClass}>
                           Target Price
                         </span>
                         <input
@@ -280,7 +334,7 @@ export function CreateBetForm({
                           }
                           onBlur={field.handleBlur}
                           placeholder="e.g. 100"
-                          className="w-32 rounded-[10px] bg-[#f3f3f3] h-9.5 pl-2.75 pr-2 text-xs font-medium text-[#111] outline-none placeholder:text-[#111]"
+                          className={inputClass}
                           style={{ boxShadow: "0px 0px 0px 1px #0000001C" }}
                         />
                       </div>
@@ -302,7 +356,7 @@ export function CreateBetForm({
                     {(field) => (
                       <div className="pb-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-fg-base">
+                          <span className={subLabelClass}>
                             Second Token
                           </span>
                           <TokenCombobox
@@ -311,6 +365,9 @@ export function CreateBetForm({
                             onBlur={field.handleBlur}
                             placeholder="Select token"
                             triggerClassName="h-auto w-32 rounded-[10px] border-0 bg-[#f3f3f3] h-9 pl-2.75 pr-2 text-xs"
+                            dropdownClassName={
+                              panel ? "left-auto right-0" : undefined
+                            }
                           />
                         </div>
                         <FieldError field={field} />
@@ -321,7 +378,7 @@ export function CreateBetForm({
                   <form.Field name="creatorSide">
                     {(field) => (
                       <div className="flex items-center justify-between pb-4">
-                        <span className="text-xs font-semibold text-fg-base">
+                        <span className={subLabelClass}>
                           Your Pick
                         </span>
                         <form.Subscribe
@@ -364,7 +421,7 @@ export function CreateBetForm({
         <form.Field name="duration">
           {(field) => (
             <div className="flex items-center justify-between pb-4">
-              <span className="text-caption font-semibold text-fg-base">
+              <span className={labelClass}>
                 Timeframe
               </span>
               <DurationPicker
@@ -386,7 +443,7 @@ export function CreateBetForm({
           {(field) => (
             <div className="">
               <div className="flex items-center justify-between">
-                <span className="text-caption font-semibold text-fg-base">
+                <span className={labelClass}>
                   Stake Amount
                 </span>
                 <input
@@ -398,7 +455,7 @@ export function CreateBetForm({
                   onChange={(e) => field.handleChange(Number(e.target.value))}
                   onBlur={field.handleBlur}
                   placeholder="Enter amount"
-                  className="w-32 rounded-[10px] bg-[#f3f3f3] h-9.5 pl-2.75 pr-2 text-xs font-medium text-[#111] outline-none placeholder:text-[#111]"
+                  className={inputClass}
                   style={{ boxShadow: "0px 0px 0px 1px #0000001C" }}
                 />
               </div>
@@ -436,6 +493,7 @@ export function CreateBetForm({
         The point system translates 1:1 with the USD, 1 point is equal to 1
         USD
       </p>
+      </div>
 
       {/* Submit */}
       <div className="relative">
@@ -445,7 +503,10 @@ export function CreateBetForm({
             <button
               type="submit"
               disabled={!canSubmit || isPending || isSuccess}
-              className="cursor-pointer flex h-12 w-full items-center justify-center rounded-full bg-[#0B0B0B] text-caption font-medium text-card hover:opacity-90 active:opacity-80 disabled:pointer-events-none disabled:opacity-50"
+              className={cn(
+                "cursor-pointer flex h-12 w-full items-center justify-center rounded-full bg-[#0B0B0B] text-caption font-medium text-card hover:opacity-90 active:opacity-80 disabled:pointer-events-none disabled:opacity-50",
+                panel && "h-13.5 text-sm font-semibold",
+              )}
               style={{
                 boxShadow:
                   "0px 2px 4px 0px #0B0B0B inset, 0px 2.5px 0px 0px #FFFFFFB2 inset",
@@ -464,7 +525,10 @@ export function CreateBetForm({
           data-revealed={isSuccess}
         >
           <div
-            className="flex h-12 w-full items-center justify-center rounded-full bg-[#00DD48] text-caption font-medium text-white"
+            className={cn(
+              "flex h-12 w-full items-center justify-center rounded-full bg-[#00DD48] text-caption font-medium text-white",
+              panel && "h-13.5 text-sm font-semibold",
+            )}
             style={{
               boxShadow:
                 "0px 2px 0px 0px #00DD48 inset, 0px 3.5px 0px 0px #57F189 inset",
@@ -474,6 +538,19 @@ export function CreateBetForm({
           </div>
         </div>
       </div>
+
+      {submitError && (
+        <p role="alert" className="text-center text-xs font-medium text-destructive">
+          {submitError}
+        </p>
+      )}
+
+      {panel && (
+        <p className="px-7.5 text-center text-xs font-medium leading-4 text-hint">
+          Cheq is not in direct control of any tokens or memecoins in the
+          market.
+        </p>
+      )}
     </form>
   );
 }

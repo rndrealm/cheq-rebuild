@@ -280,3 +280,78 @@ input[type="number"] {
     transform: translateX(300%);
   }
 }
+
+/* Home <-> Feed content transition (see PageTransition). Home's content shrinks
+   into the point where Feed's main carousel card sits, and grows back out of
+   it. 245px is that card's centre measured from the top of Home's content
+   panel; keep it in step with PAGE_ORIGIN in page-transition.tsx. */
+::view-transition-old(.collapse-out) {
+  transform-origin: 50% 245px;
+  animation: 195ms cubic-bezier(0.4, 0, 1, 1) both page-shrink-out;
+}
+::view-transition-new(.collapse-in) {
+  animation: 180ms ease-out 75ms both page-fade-in;
+}
+::view-transition-old(.expand-out) {
+  animation: 100ms ease-in both page-fade-out;
+}
+::view-transition-new(.expand-in) {
+  transform-origin: 50% 245px;
+  animation: 210ms cubic-bezier(0, 0, 0.2, 1) 50ms both page-grow-in;
+}
+
+@keyframes page-shrink-out {
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes page-grow-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes page-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Headers don't move: they crossfade into each other. */
+::view-transition-old(.header-out) {
+  animation: 100ms ease-in both page-fade-out;
+}
+::view-transition-new(.header-in) {
+  animation: 180ms ease-out 75ms both page-fade-in;
+}
+
+/* The sidebar and page switch button hold still during page transitions. The
+   switch stays live so its icon morph plays through the transition. */
+::view-transition-group(app-sidebar),
+::view-transition-group(page-switch) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(app-sidebar),
+::view-transition-old(page-switch) {
+  display: none;
+}
+::view-transition-new(app-sidebar),
+::view-transition-new(page-switch) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+  }
+}
