@@ -10,16 +10,6 @@ import { cn } from "@/lib/utils";
 export const CARD_WIDTH = 317;
 export const CARD_HEIGHT = 393;
 
-// DEMO: mixed status pills for the video, ignoring the bet's real status. They
-// cycle by card position so neighbours always differ. To go back to real data:
-// getStatusConfig(bet.status, bet.winnerId === viewerId), with the viewer's id.
-const DEMO_STATUSES = [
-  { status: "active", won: false },
-  { status: "resolved", won: true },
-  { status: "pending", won: false },
-  { status: "resolved", won: false },
-] as const;
-
 function getTerms(bet: FeedBet) {
   if (bet.type === "up_down") {
     return {
@@ -33,15 +23,14 @@ function getTerms(bet: FeedBet) {
 /** A bet in the Feed carousel: who, how much, and its stake details. */
 export function BetCarouselCard({
   bet,
-  index,
+  viewerId,
 }: {
   bet: FeedBet;
-  index: number;
+  viewerId: string;
 }) {
   const terms = getTerms(bet);
-  const demo = DEMO_STATUSES[index % DEMO_STATUSES.length];
-  const status = getStatusConfig(demo.status, demo.won);
-  const label = demo.status === "active" ? "Running" : status.label;
+  const status = getStatusConfig(bet.status, bet.winnerId === viewerId);
+  const label = bet.status === "active" ? "Running" : status.label;
 
   return (
     <article

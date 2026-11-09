@@ -4,6 +4,9 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useUser } from "@/components/providers/user-provider";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { getLockedPoints } from "@/lib/helpers/bets";
 import { formatPrice } from "@/lib/helpers/format";
 import { AppRoutes } from "@/lib/routes";
 import { EyeIcon, HistoryIcon, NewTradeIcon } from "@/lib/svgs";
@@ -18,6 +21,10 @@ const TILES = [
 export function TradeTiles({ className }: { className?: string }) {
   const user = useUser();
   const [hidden, setHidden] = useState(false);
+  // Already subscribed by the layout, so this is instant.
+  const bets = useQuery(api.bets.feedForUser, { userId: user._id });
+  // Available points plus what's locked in bets.
+  const total = user.points + (bets ? getLockedPoints(bets, user._id) : 0);
 
   return (
     <section className={cn("flex min-w-0 flex-col gap-5 pb-4", className)}>
@@ -54,7 +61,7 @@ export function TradeTiles({ className }: { className?: string }) {
 
         <div className="flex items-end justify-between gap-4">
           <span className="min-w-0 truncate font-display text-2xl leading-8 font-semibold tabular-nums text-fg-base">
-            {hidden ? "$******" : formatPrice(user.points)}
+            {hidden ? "$******" : formatPrice(total)}
           </span>
           <Image
             src="/media/demo/kurosawa.jpg"

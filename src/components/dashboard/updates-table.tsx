@@ -9,11 +9,13 @@ import {
   useMotionValue,
   useTransform,
 } from "motion/react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { RemoteImage } from "@/components/ui/remote-image";
 import { useDrag } from "@/hooks/use-drag";
 import mainAssets from "@/lib/assets";
 import { getTokenImage } from "@/lib/constants/tokens";
-import { formatTimeAgo } from "@/lib/helpers/bet-events";
+import { describeFeedEvent, formatTimeAgo } from "@/lib/helpers/bet-events";
 import {
   applyRubberBand,
   clamp,
@@ -34,17 +36,6 @@ type Update = {
 };
 type DragHandlers = Parameters<typeof useDrag>[0];
 type Axis = "x" | "y" | null;
-
-// DEMO: sample updates so the list looks full. For real data, use
-// api.checkpoints.recentFeed with describeFeedEvent for the title and detail.
-const SAMPLE_UPDATES = [
-  { symbol: "AAVE", title: "AAVE moved by 0.4%", detail: "AAVE at $131.40", minutesAgo: 1 },
-  { symbol: "NEAR", title: "You took the lead on NEAR", detail: "NEAR at $2.41 (+1.2%)", minutesAgo: 3 },
-  { symbol: "ARB", title: "ARB up 6.8% today", detail: "ARB at $0.1673", minutesAgo: 6 },
-  { symbol: "NEAR", title: "NEAR is 75% of the way to $2.60", detail: "NEAR at $2.41", minutesAgo: 9 },
-  { symbol: "AAVE", title: "AAVE hit a 24h high", detail: "AAVE at $131.40", minutesAgo: 14 },
-  { symbol: "ARB", title: "Final stretch on ARB", detail: "You're ahead by 0.8%", minutesAgo: 22 },
-];
 
 const ROW_HEIGHT = 48;
 // How far a row slides open to show its actions.
@@ -212,18 +203,25 @@ function ActionButton({
 }
 
 /**
- * Home page updates, as a swipeable list (sample data for now). Swipe a row
+ * Home page updates: the latest bet checkpoints, as a swipeable list. Swipe a row
  * left for its actions; drag or wheel to scroll, with momentum and rubber
  * banding at the ends.
  */
 export function UpdatesTable({ className }: { className?: string }) {
+  const rows = useQuery(api.checkpoints.recentFeed);
   const [now, setNow] = useState(() => Date.now());
-  const [updates] = useState<Update[]>(() =>
-    SAMPLE_UPDATES.map(({ minutesAgo, ...update }, index) => ({
-      ...update,
-      id: String(index),
-      at: now - minutesAgo * 60_000,
-    })),
+  const updates: Update[] | undefined = rows?.map(
+    ({ event, bet, creator, opponent }) => {
+      const copy = describeFeedEvent(event, bet, creator, opponent);
+      return {
+        id: event._id,
+        symbol: bet.token.symbol,
+        title: copy.title,
+        // Drop the sentence's full stop; the row reads as two short phrases.
+        detail: copy.body.replace(/\.$/, ""),
+        at: event.at,
+      };
+    },
   );
   // Deleting only hides a row for this visit; nothing is saved yet.
   const [deleted, setDeleted] = useState<ReadonlySet<string>>(new Set());
@@ -340,7 +338,7 @@ export function UpdatesTable({ className }: { className?: string }) {
     },
   };
 
-  const visible = updates.filter((update) => !deleted.has(update.id));
+  const visible = updates?.filter((update) => !deleted.has(update.id));
 
   return (
     <section className={cn("flex min-w-0 flex-col gap-4.5", className)}>
@@ -360,7 +358,7 @@ export function UpdatesTable({ className }: { className?: string }) {
         ref={boundaryRef}
         className="relative min-h-60.75 flex-1 overflow-hidden rounded-xl bg-card"
       >
-        {visible.length === 0 && (
+        {visible?.length === 0 && (
           <p className="absolute inset-0 flex items-center justify-center text-sm font-medium text-gray-12/55">
             No updates yet.
           </p>
@@ -373,7 +371,7 @@ export function UpdatesTable({ className }: { className?: string }) {
               animate(y, clamp(y.get(), getMin(), 0), BOUNCE);
             }}
           >
-            {visible.map((update, index) => (
+            {visible?.map((update, index) => (
               <motion.div
                 key={update.id}
                 initial={{ height: 0, opacity: 0 }}

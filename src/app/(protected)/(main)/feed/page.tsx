@@ -64,7 +64,7 @@ export default function FeedPage() {
             <EmptyState />
           ) : (
             <>
-              <BetCarousel bets={bets} />
+              <BetCarousel bets={bets} viewerId={user._id} />
 
               <motion.div
                 initial={reducedMotion ? false : { opacity: 0, y: 8 }}

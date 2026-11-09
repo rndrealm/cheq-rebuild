@@ -231,3 +231,30 @@ export function formatTimeLeft(ms: number): string {
   if (hours > 0) return `${hours}h ${minutes}m left`;
   return `${minutes}m left`;
 }
+
+// Points tied up in bets: your stake in challenges you've opened that nobody
+// has taken yet (pending, countered) and in every live bet on either side.
+// Mirrors what the server locks when a bet is created or accepted.
+export function getLockedPoints(
+  bets: {
+    status: BetStatus;
+    creatorId: string;
+    creatorWager: number;
+    opponentWager: number;
+  }[],
+  userId: string,
+): number {
+  let locked = 0;
+  for (const bet of bets) {
+    const isCreator = bet.creatorId === userId;
+    if (bet.status === "active") {
+      locked += isCreator ? bet.creatorWager : bet.opponentWager;
+    } else if (
+      isCreator &&
+      (bet.status === "pending" || bet.status === "countered")
+    ) {
+      locked += bet.creatorWager;
+    }
+  }
+  return locked;
+}

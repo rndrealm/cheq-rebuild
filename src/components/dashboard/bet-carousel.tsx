@@ -52,12 +52,14 @@ function Slide({
   index,
   firstVisible,
   progress,
+  viewerId,
   animateIn,
 }: {
   bet: FeedBet;
   index: number;
   firstVisible: number;
   progress: MotionValue<number>;
+  viewerId: string;
   animateIn: boolean;
 }) {
   // Distance from the centre, in cards.
@@ -85,7 +87,7 @@ function Slide({
           delay: ENTER_DELAY_S + Math.abs(index - firstVisible) * ENTER_STAGGER_S,
         }}
       >
-        <BetCarouselCard bet={bet} index={index} />
+        <BetCarouselCard bet={bet} viewerId={viewerId} />
       </motion.div>
     </motion.div>
   );
@@ -96,7 +98,13 @@ function Slide({
  * to move (it snaps to the nearest card), or use the trackpad, the arrow keys,
  * or a tap on a side card.
  */
-export function BetCarousel({ bets }: { bets: FeedBet[] }) {
+export function BetCarousel({
+  bets,
+  viewerId,
+}: {
+  bets: FeedBet[];
+  viewerId: string;
+}) {
   const reducedMotion = useReducedMotion();
   // Open on the second card so there's a neighbour on both sides.
   const startIndex = Math.min(1, bets.length - 1);
@@ -231,6 +239,7 @@ export function BetCarousel({ bets }: { bets: FeedBet[] }) {
             index={i}
             firstVisible={current}
             progress={progress}
+            viewerId={viewerId}
             animateIn={!reducedMotion}
           />
         ))}
