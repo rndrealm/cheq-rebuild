@@ -361,3 +361,33 @@ input[type="number"] {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* WipeReveal (components/ui/wipe-reveal.tsx): the skeleton overlay is masked
+   away with a soft edge once content is ready. --wipe is registered so the
+   mask position can transition. */
+@property --wipe {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+
+.wipe-reveal {
+  --wipe: 100%;
+  mask-image: linear-gradient(
+    to right,
+    black var(--wipe),
+    transparent calc(var(--wipe) + 100%)
+  );
+  transition: --wipe var(--wipe-duration, 0.6s) ease-in-out;
+}
+
+.wipe-reveal[data-revealed="true"] {
+  --wipe: -100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still ends (so the overlay is removed), just without the sweep. */
+  .wipe-reveal {
+    transition-duration: 1ms;
+  }
+}

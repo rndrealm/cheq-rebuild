@@ -124,9 +124,15 @@ export default defineSchema({
     progress: v.optional(v.number()),
     // lead_change: who just took the lead.
     leader: v.optional(v.union(v.literal("creator"), v.literal("opponent"))),
+    // The bet's players, copied here so each player's checkpoints can be
+    // listed by index. Optional only for events recorded before this was
+    // added (backfilled by checkpoints.backfillPlayers).
+    creatorId: v.optional(v.id("users")),
+    opponentId: v.optional(v.id("users")),
   })
     .index("by_betId_and_key", ["betId", "key"])
-    .index("by_at", ["at"]),
+    .index("by_creatorId_and_at", ["creatorId", "at"])
+    .index("by_opponentId_and_at", ["opponentId", "at"]),
 
   // Latest price and 24h stats per supported token, from Binance. One row per
   // token, overwritten by the checkpoint poller every 30s (see market.ts).

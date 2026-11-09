@@ -318,35 +318,69 @@ describe("recordCheckpoints", () => {
     expect(await t.query(api.checkpoints.listForBet, { betId: live })).toEqual([]);
   });
 
-  test("recentFeed: newest events across bets with player names; empty when logged out", async () => {
+  test("records the bet's players on each checkpoint", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(START + HOUR * 0.1);
+    const t = convexTest({ schema, modules });
+    const { live } = await seed(t);
+    await t.mutation(internal.checkpoints.recordCheckpoints, { prices: { BTC: 160 } });
+    const bet = await t.run(async (ctx) => ctx.db.get(live));
+    expect(await eventsFor(t, live)).toMatchObject([
+      { creatorId: bet!.creatorId, opponentId: bet!.opponentId },
+    ]);
+  });
+
+  test("myFeed: the caller's checkpoints from either side, newest first", async () => {
     const t = convexTest({ schema, modules });
     const { live } = await seed(t);
     await t.run(async (ctx) => {
+      const bet = (await ctx.db.get(live))!;
+      const players = { creatorId: bet.creatorId, opponentId: bet.opponentId };
       await ctx.db.insert("betEvents", {
-        betId: live,
-        key: "progress_50",
-        kind: "progress",
-        progress: 50,
-        at: 1,
-        price: 150,
+        betId: live, key: "progress_50", kind: "progress", progress: 50, at: 1, price: 150, ...players,
       });
       await ctx.db.insert("betEvents", {
-        betId: live,
-        key: "halfway",
-        kind: "halfway",
-        at: 2,
-        price: 160,
+        betId: live, key: "halfway", kind: "halfway", at: 2, price: 160, ...players,
+      });
+      // A checkpoint in someone else's bet: in neither alice's nor bob's feed.
+      const profile = {
+        name: "x", points: 0, level: 1, xp: 0, mu: 25, sigma: 8, displayRating: 0,
+        currentStreak: 0, longestStreak: 0, lastActiveAt: 0,
+      };
+      const carol = await ctx.db.insert("users", { ...profile, authId: "c", username: "carol" });
+      const dave = await ctx.db.insert("users", { ...profile, authId: "d", username: "dave" });
+      await ctx.db.insert("betEvents", {
+        betId: live, key: "final_stretch", kind: "final_stretch", at: 3, price: 1,
+        creatorId: carol, opponentId: dave,
       });
     });
 
-    const rows = await t
-      .withIdentity({ subject: "a" })
-      .query(api.checkpoints.recentFeed, {});
-    expect(rows.map((r) => r.event.key)).toEqual(["halfway", "progress_50"]);
-    expect(rows[0].bet._id).toBe(live);
-    expect(rows[0].creator).toBe("alice");
-    expect(rows[0].opponent).toBe("bob");
+    const asAlice = await t.withIdentity({ subject: "a" }).query(api.checkpoints.myFeed, {});
+    expect(asAlice.map((r) => r.event.key)).toEqual(["halfway", "progress_50"]);
+    expect(asAlice[0]).toMatchObject({ isCreator: true, rival: "bob" });
 
-    expect(await t.query(api.checkpoints.recentFeed, {})).toEqual([]);
+    const asBob = await t.withIdentity({ subject: "b" }).query(api.checkpoints.myFeed, {});
+    expect(asBob.map((r) => r.event.key)).toEqual(["halfway", "progress_50"]);
+    expect(asBob[0]).toMatchObject({ isCreator: false, rival: "alice" });
+
+    expect(await t.query(api.checkpoints.myFeed, {})).toEqual([]);
+  });
+
+  test("backfillPlayers: fills old checkpoints and drops orphans", async () => {
+    const t = convexTest({ schema, modules });
+    const { live, pending } = await seed(t);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("betEvents", { betId: live, key: "halfway", kind: "halfway", at: 1, price: 1 });
+      await ctx.db.insert("betEvents", { betId: pending, key: "halfway", kind: "halfway", at: 1, price: 1 });
+      await ctx.db.delete(pending);
+    });
+
+    expect(await t.mutation(internal.checkpoints.backfillPlayers, {})).toBe(2);
+    expect(await t.mutation(internal.checkpoints.backfillPlayers, {})).toBe(0);
+    const bet = await t.run(async (ctx) => ctx.db.get(live));
+    expect(await eventsFor(t, live)).toMatchObject([
+      { creatorId: bet!.creatorId, opponentId: bet!.opponentId },
+    ]);
+    expect(await eventsFor(t, pending)).toEqual([]);
   });
 });

@@ -50,24 +50,36 @@ export const listForBet = optionalAuthQuery({
   },
 });
 
-// Upper bound on events in the dashboard feed.
+// Upper bound on events in the dashboard's Updates list.
 const FEED_EVENTS = 10;
 
-// The newest checkpoints across all bets, for the dashboard feed, each with
-// its bet and both players' names so the client can word it in the third
-// person. Signed-in users only (empty when logged out); the bets themselves
-// are already public via bets.feed.
-export const recentFeed = optionalAuthQuery({
+// The caller's newest checkpoints across their bets, for the dashboard's
+// Updates list: each with its bet, which side the caller is on and the
+// rival's username, so the client can word it from their side. Empty when
+// logged out.
+export const myFeed = optionalAuthQuery({
   args: {},
   handler: async (ctx) => {
     if (!ctx.user) return [];
-    const events = await ctx.db
-      .query("betEvents")
-      .withIndex("by_at")
-      .order("desc")
-      .take(FEED_EVENTS);
+    const me = ctx.user._id;
 
-    const names = new Map<string, string | null>();
+    const [asCreator, asOpponent] = await Promise.all([
+      ctx.db
+        .query("betEvents")
+        .withIndex("by_creatorId_and_at", (q) => q.eq("creatorId", me))
+        .order("desc")
+        .take(FEED_EVENTS),
+      ctx.db
+        .query("betEvents")
+        .withIndex("by_opponentId_and_at", (q) => q.eq("opponentId", me))
+        .order("desc")
+        .take(FEED_EVENTS),
+    ]);
+    const events = [...asCreator, ...asOpponent]
+      .sort((a, b) => b.at - a.at)
+      .slice(0, FEED_EVENTS);
+
+    const names = new Map<Id<"users">, string | null>();
     const nameOf = async (id: Id<"users"> | undefined) => {
       if (!id) return null;
       if (!names.has(id)) {
@@ -81,14 +93,43 @@ export const recentFeed = optionalAuthQuery({
     for (const event of events) {
       const bet = await ctx.db.get(event.betId);
       if (!bet) continue;
+      const isCreator = bet.creatorId === me;
       rows.push({
         event,
         bet,
-        creator: await nameOf(bet.creatorId),
-        opponent: await nameOf(bet.opponentId),
+        isCreator,
+        rival: await nameOf(isCreator ? bet.opponentId : bet.creatorId),
       });
     }
     return rows;
+  },
+});
+
+// One-off: copies each bet's players onto checkpoints recorded before
+// betEvents had them. Run once per deployment after deploying:
+//   npx convex run checkpoints:backfillPlayers
+// Re-run until it returns 0 (each run handles one batch).
+export const backfillPlayers = internalMutation({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const missing = await ctx.db
+      .query("betEvents")
+      .withIndex("by_creatorId_and_at", (q) => q.eq("creatorId", undefined))
+      .take(200);
+    for (const event of missing) {
+      const bet = await ctx.db.get(event.betId);
+      // The bet is gone, so the checkpoint can't be shown anywhere.
+      if (!bet) {
+        await ctx.db.delete(event._id);
+        continue;
+      }
+      await ctx.db.patch(event._id, {
+        creatorId: bet.creatorId,
+        opponentId: bet.opponentId,
+      });
+    }
+    return missing.length;
   },
 });
 
@@ -117,6 +158,8 @@ export const recordCheckpoints = internalMutation({
       for (const checkpoint of found) {
         await ctx.db.insert("betEvents", {
           betId: bet._id,
+          creatorId: bet.creatorId,
+          opponentId: bet.opponentId,
           ...checkpoint,
           at: now,
           price: priceA,

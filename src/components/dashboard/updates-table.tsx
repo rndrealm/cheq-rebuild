@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AnimatePresence,
   animate,
@@ -12,10 +13,11 @@ import {
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { RemoteImage } from "@/components/ui/remote-image";
+import { WipeReveal } from "@/components/ui/wipe-reveal";
 import { useDrag } from "@/hooks/use-drag";
 import mainAssets from "@/lib/assets";
 import { getTokenImage } from "@/lib/constants/tokens";
-import { describeFeedEvent, formatTimeAgo } from "@/lib/helpers/bet-events";
+import { describeEvent, formatTimeAgo } from "@/lib/helpers/bet-events";
 import {
   applyRubberBand,
   clamp,
@@ -29,6 +31,7 @@ import { cn } from "@/lib/utils";
 
 type Update = {
   id: string;
+  betId: string;
   symbol: string;
   title: string;
   detail: string;
@@ -45,6 +48,8 @@ const ACTIONS_WIDTH = 119;
 const LOCK_THRESHOLD = 10;
 const SWIPE = springFromResponse(0.4, 1);
 const BOUNCE = springFromResponse(0.5, 1);
+// Placeholder rows while the list loads.
+const SKELETON_ROWS = 5;
 
 function UpdateRow({
   update,
@@ -60,6 +65,7 @@ function UpdateRow({
   scroll: DragHandlers;
   onDelete: () => void;
 }) {
+  const router = useRouter();
   const rowRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const originX = useRef(0);
@@ -107,6 +113,14 @@ function UpdateRow({
       // The list always gets its onEnd (it tracks dragging state), but only a
       // vertical drag hands it any speed
       scroll.onEnd?.(axis.current === "y" ? velocity : { x: 0, y: 0 });
+
+      // A tap (never moved far enough to pick an axis): closes the row if
+      // it's open, otherwise opens the bet.
+      if (axis.current === null) {
+        if (x.get() < 0) animate(x, 0, SWIPE);
+        else router.push(AppRoutes.betDetail.path(update.betId));
+        return;
+      }
       if (axis.current !== "x") return;
 
       const landing = x.get() + project(velocity.x);
@@ -147,7 +161,7 @@ function UpdateRow({
       <motion.div
         {...drag}
         style={{ x, backgroundColor: background }}
-        className="relative z-10 flex h-full w-full cursor-grab touch-none items-center justify-between gap-4 px-6.5 select-none active:cursor-grabbing"
+        className="relative z-10 flex h-full w-full cursor-pointer touch-none items-center justify-between gap-4 px-6.5 select-none active:cursor-grabbing"
       >
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <RemoteImage
@@ -203,18 +217,24 @@ function ActionButton({
 }
 
 /**
- * Home page updates: the latest bet checkpoints, as a swipeable list. Swipe a row
- * left for its actions; drag or wheel to scroll, with momentum and rubber
- * banding at the ends.
+ * Home page updates: checkpoints in the viewer's bets, newest first, as a
+ * swipeable list. Tap a row to open its bet; swipe it left for its actions;
+ * drag or wheel to scroll, with momentum and rubber banding at the ends.
  */
 export function UpdatesTable({ className }: { className?: string }) {
-  const rows = useQuery(api.checkpoints.recentFeed);
+  const rows = useQuery(api.checkpoints.myFeed);
   const [now, setNow] = useState(() => Date.now());
   const updates: Update[] | undefined = rows?.map(
-    ({ event, bet, creator, opponent }) => {
-      const copy = describeFeedEvent(event, bet, creator, opponent);
+    ({ event, bet, isCreator, rival }) => {
+      const copy = describeEvent(
+        event,
+        bet,
+        isCreator,
+        rival ? `@${rival}` : "Your rival",
+      );
       return {
         id: event._id,
+        betId: bet._id,
         symbol: bet.token.symbol,
         title: copy.title,
         // Drop the sentence's full stop; the row reads as two short phrases.
@@ -364,36 +384,65 @@ export function UpdatesTable({ className }: { className?: string }) {
           </p>
         )}
 
-        <motion.div ref={trackRef} style={{ y }} className="w-full">
-          <AnimatePresence
-            initial={false}
-            onExitComplete={() => {
-              animate(y, clamp(y.get(), getMin(), 0), BOUNCE);
-            }}
-          >
-            {visible?.map((update, index) => (
-              <motion.div
-                key={update.id}
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: ROW_HEIGHT, opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={SWIPE}
-                className="overflow-hidden"
-              >
-                <UpdateRow
-                  update={update}
-                  now={now}
-                  isLast={index === visible.length - 1}
-                  scroll={scroll}
-                  onDelete={() =>
-                    setDeleted((prev) => new Set(prev).add(update.id))
-                  }
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        <WipeReveal
+          revealed={rows !== undefined}
+          skeleton={<UpdateSkeleton />}
+        >
+          <motion.div ref={trackRef} style={{ y }} className="w-full">
+            <AnimatePresence
+              initial={false}
+              onExitComplete={() => {
+                animate(y, clamp(y.get(), getMin(), 0), BOUNCE);
+              }}
+            >
+              {visible?.map((update, index) => (
+                <motion.div
+                  key={update.id}
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: ROW_HEIGHT, opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={SWIPE}
+                  className="overflow-hidden"
+                >
+                  <UpdateRow
+                    update={update}
+                    now={now}
+                    isLast={index === visible.length - 1}
+                    scroll={scroll}
+                    onDelete={() =>
+                      setDeleted((prev) => new Set(prev).add(update.id))
+                    }
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        </WipeReveal>
       </div>
     </section>
+  );
+}
+
+function UpdateSkeleton() {
+  return (
+    <div aria-hidden className="w-full">
+      {Array.from({ length: SKELETON_ROWS }, (_, i) => (
+        <div
+          key={i}
+          className={cn(
+            "flex items-center justify-between gap-4 px-6.5",
+            i < SKELETON_ROWS - 1 && "border-b border-black/4",
+          )}
+          style={{ height: ROW_HEIGHT }}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <div className="size-6.5 shrink-0 animate-pulse rounded-full bg-gray-4" />
+            <div className="h-3.5 w-40 animate-pulse rounded bg-gray-4" />
+            <div className="h-3.5 w-28 animate-pulse rounded bg-gray-3" />
+          </div>
+          <div className="h-3.5 w-12 shrink-0 animate-pulse rounded bg-gray-3" />
+        </div>
+      ))}
+    </div>
   );
 }
