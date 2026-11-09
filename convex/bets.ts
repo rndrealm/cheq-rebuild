@@ -98,18 +98,25 @@ export const feed = query({
   },
 });
 
-export const feedForUser = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const asCreator = await ctx.db
-      .query("bets")
-      .withIndex("by_creatorId", (q) => q.eq("creatorId", args.userId))
-      .collect();
+// All the caller's bets (either side), newest first, each with both players'
+// names. Powers Feed and the home balance. Returns [] when logged out so the
+// live query doesn't throw during sign-out.
+export const mine = optionalAuthQuery({
+  args: {},
+  handler: async (ctx) => {
+    if (!ctx.user) return [];
+    const userId = ctx.user._id;
 
-    const asOpponent = await ctx.db
-      .query("bets")
-      .withIndex("by_opponentId", (q) => q.eq("opponentId", args.userId))
-      .collect();
+    const [asCreator, asOpponent] = await Promise.all([
+      ctx.db
+        .query("bets")
+        .withIndex("by_creatorId", (q) => q.eq("creatorId", userId))
+        .collect(),
+      ctx.db
+        .query("bets")
+        .withIndex("by_opponentId", (q) => q.eq("opponentId", userId))
+        .collect(),
+    ]);
 
     const allBets = [...asCreator, ...asOpponent].sort(
       (a, b) => b._creationTime - a._creationTime,
@@ -123,7 +130,7 @@ export const feedForUser = query({
 
     const usersMap: Record<string, { name: string; username: string }> = {};
     for (const id of userIds) {
-      const user = await ctx.db.get(id as typeof args.userId);
+      const user = await ctx.db.get(id as Id<"users">);
       if (user) usersMap[id] = { name: user.name, username: user.username };
     }
 
@@ -132,6 +139,55 @@ export const feedForUser = query({
       creator: usersMap[bet.creatorId] ?? null,
       opponent: bet.opponentId ? (usersMap[bet.opponentId] ?? null) : null,
     }));
+  },
+});
+
+// Upper bound on bets read per (side, status) for the balance. Live bets are
+// capped by MAX_ACTIVE_BETS and open challenges expire, so this is headroom.
+const MAX_LOCKED_BETS = 100;
+
+// The caller's balance: available points plus points held in bets, i.e. their
+// stake in every live bet on either side, in open challenges they created
+// (the opponent only pays on accept) and in flagged bets, whose stakes stay
+// held until resolved by hand. Null when logged out.
+export const myBalance = optionalAuthQuery({
+  args: {},
+  returns: v.union(
+    v.null(),
+    v.object({ available: v.number(), locked: v.number(), total: v.number() }),
+  ),
+  handler: async (ctx) => {
+    if (!ctx.user) return null;
+    const me = ctx.user._id;
+
+    const asCreator = (["active", "flagged", "pending", "countered"] as const).map(
+      (status) =>
+        ctx.db
+          .query("bets")
+          .withIndex("by_creatorId_status", (q) =>
+            q.eq("creatorId", me).eq("status", status),
+          )
+          .take(MAX_LOCKED_BETS),
+    );
+    const asOpponent = (["active", "flagged"] as const).map((status) =>
+      ctx.db
+        .query("bets")
+        .withIndex("by_opponentId_status", (q) =>
+          q.eq("opponentId", me).eq("status", status),
+        )
+        .take(MAX_LOCKED_BETS),
+    );
+
+    const [created, joined] = await Promise.all([
+      Promise.all(asCreator),
+      Promise.all(asOpponent),
+    ]);
+    const locked =
+      created.flat().reduce((sum, bet) => sum + bet.creatorWager, 0) +
+      joined.flat().reduce((sum, bet) => sum + bet.opponentWager, 0);
+
+    const available = ctx.user.points;
+    return { available, locked, total: available + locked };
   },
 });
 

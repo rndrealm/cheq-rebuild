@@ -352,7 +352,39 @@ export const EyeIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export const ChevronLeftIcon = ({ className }: { className?: string }) => (
+// EyeIcon with a slash through it. Drawn to match; not from Figma.
+export const EyeOffIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 18 18"
+    fill="none"
+    aria-hidden
+    className={className}
+  >
+    <path
+      d="M11.25 9C11.25 10.2427 10.2427 11.25 9 11.25C7.75732 11.25 6.75 10.2427 6.75 9C6.75 7.75732 7.75732 6.75 9 6.75C10.2427 6.75 11.25 7.75732 11.25 9Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M15.9186 7.98915C12.3072 2.33691 5.69326 2.33697 2.08186 7.98922C1.68886 8.6043 1.68886 9.39577 2.08186 10.0108C5.69326 15.6631 12.3072 15.663 15.9186 10.0108C16.3116 9.3957 16.3116 8.60422 15.9186 7.98915Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M2.25 2.25L15.75 15.75"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+export const ChevronLeftIcon =({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 18 18"

@@ -17,7 +17,7 @@ import { ChevronLeftIcon, FilterIcon } from "@/lib/svgs";
 
 export default function FeedPage() {
   const user = useUser();
-  const bets = useQuery(api.bets.feedForUser, { userId: user._id });
+  const bets = useQuery(api.bets.mine);
   const reducedMotion = useReducedMotion();
 
   const totalStake = bets?.reduce(

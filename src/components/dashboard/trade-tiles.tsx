@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { useUser } from "@/components/providers/user-provider";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { getLockedPoints } from "@/lib/helpers/bets";
+import { useUser } from "@/components/providers/user-provider";
+import { RemoteImage } from "@/components/ui/remote-image";
+import { WipeReveal } from "@/components/ui/wipe-reveal";
+import { useStoredFlag } from "@/hooks/use-stored-flag";
 import { formatPrice } from "@/lib/helpers/format";
 import { AppRoutes } from "@/lib/routes";
-import { EyeIcon, HistoryIcon, NewTradeIcon } from "@/lib/svgs";
+import { EyeIcon, EyeOffIcon, HistoryIcon, NewTradeIcon } from "@/lib/svgs";
 import { cn } from "@/lib/utils";
 
 const TILES = [
@@ -17,14 +17,16 @@ const TILES = [
   { label: "Trade History", href: AppRoutes.feed.path, icon: HistoryIcon },
 ];
 
+const AVATAR_FALLBACK = "/media/avatar.png";
+
 /** Home page shortcuts, with the balance and avatar underneath. */
 export function TradeTiles({ className }: { className?: string }) {
   const user = useUser();
-  const [hidden, setHidden] = useState(false);
-  // Already subscribed by the layout, so this is instant.
-  const bets = useQuery(api.bets.feedForUser, { userId: user._id });
-  // Available points plus what's locked in bets.
-  const total = user.points + (bets ? getLockedPoints(bets, user._id) : 0);
+  // Remembered per browser, like most finance apps.
+  const [hidden, setHidden] = useStoredFlag("cheq:hide-balance");
+  // Available points plus what's held in bets. Also subscribed by the layout,
+  // so it's usually ready when Home mounts.
+  const total = useQuery(api.bets.myBalance)?.total;
 
   return (
     <section className={cn("flex min-w-0 flex-col gap-5 pb-4", className)}>
@@ -51,27 +53,55 @@ export function TradeTiles({ className }: { className?: string }) {
           <button
             type="button"
             aria-label={hidden ? "Show balance" : "Hide balance"}
-            aria-pressed={hidden}
-            onClick={() => setHidden((v) => !v)}
-            className="flex size-5 cursor-pointer items-center justify-center rounded text-gray-12 outline-none hover:bg-gray-3 focus-visible:ring-3 focus-visible:ring-ring/50"
+            onClick={() => setHidden(!hidden)}
+            // The ::after widens the hit area to 32px without moving the icon.
+            className="relative flex size-5 cursor-pointer items-center justify-center rounded text-gray-12 outline-none after:absolute after:-inset-1.5 hover:bg-gray-3 focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            <EyeIcon className="size-4.5" />
+            {hidden ? (
+              <EyeOffIcon className="size-4.5" />
+            ) : (
+              <EyeIcon className="size-4.5" />
+            )}
           </button>
         </div>
 
         <div className="flex items-end justify-between gap-4">
-          <span className="min-w-0 truncate font-display text-2xl leading-8 font-semibold tabular-nums text-fg-base">
-            {hidden ? "$******" : formatPrice(total)}
-          </span>
-          <Image
-            src="/media/demo/kurosawa.jpg"
+          <div className="min-w-0 flex-1">
+            <WipeReveal
+              revealed={total !== undefined}
+              skeleton={<BalanceSkeleton />}
+              className="bg-gray-2"
+            >
+              <p className="truncate font-display text-2xl leading-8 font-semibold tabular-nums text-fg-base"
+              >
+                {hidden ? (
+                  <>
+                    <span aria-hidden>$******</span>
+                    <span className="sr-only">Hidden</span>
+                  </>
+                ) : (
+                  formatPrice(total ?? 0)
+                )}
+              </p>
+            </WipeReveal>
+          </div>
+          <RemoteImage
+            src={user.avatarUrl}
+            fallback={AVATAR_FALLBACK}
             alt=""
-            width={32}
-            height={32}
-            className="size-8 shrink-0 rounded-[26px] bg-[#f0f0f0] object-cover"
+            size={32}
+            className="shrink-0 bg-gray-4"
           />
         </div>
       </div>
     </section>
+  );
+}
+
+function BalanceSkeleton() {
+  return (
+    <div aria-hidden className="flex h-8 items-center">
+      <div className="h-6 w-32 animate-pulse rounded bg-gray-4" />
+    </div>
   );
 }

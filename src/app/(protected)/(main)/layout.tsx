@@ -4,7 +4,6 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { AppSidebar } from "@/components/app-sidebar";
 import { PageSwitch } from "@/components/dashboard/page-switch";
-import { useUser } from "@/components/providers/user-provider";
 
 /** Shell for Home and Feed: the sidebar and switch button stay put between them. */
 export default function MainLayout({
@@ -12,10 +11,11 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = useUser();
   // Keeps your bets subscribed on Home, so the Feed carousel is ready the
   // moment the transition starts instead of arriving as a skeleton.
-  useQuery(api.bets.feedForUser, { userId: user._id });
+  useQuery(api.bets.mine);
+  // And the balance, so it's there when Home remounts.
+  useQuery(api.bets.myBalance);
   // Same for market prices, so the ticker and chart stats are there the
   // moment Home remounts.
   useQuery(api.market.snapshot);
