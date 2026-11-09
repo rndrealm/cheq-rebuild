@@ -79,8 +79,8 @@ function TokenRow({
             className={cn(
               "font-display text-caption! font-medium leading-4",
               priceData.priceChange24h >= 0
-                ? "text-[#47a95e]"
-                : "text-destructive",
+                ? "text-price-up"
+                : "text-price-down",
             )}
           >
             {priceData.priceChange24h >= 0 ? "+" : ""}

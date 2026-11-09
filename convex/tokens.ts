@@ -12,55 +12,55 @@ import {
 } from "./lib/tokens";
 import { SUPPORTED_TOKENS } from "./lib/constants";
 import { fetchMarketTickers } from "./lib/market";
+import {
+  CHART_POINTS,
+  chartPointValidator,
+  downsample,
+  parseKlines,
+  type ChartPoint,
+} from "./lib/chart";
 
-const INTERVAL_CONFIG: Record<
-  string,
-  { interval: string; limit: number }
-> = {
-  "1D": { interval: "1h", limit: 24 },
-  "1W": { interval: "4h", limit: 42 },
-  "1M": { interval: "1d", limit: 30 },
+// Candles per chart range. Each range has at least CHART_POINTS candles
+// (except YTD early in the year), so hovering lands on real closes.
+const INTERVAL_CONFIG: Record<string, { interval: string; limit: number }> = {
+  "1D": { interval: "15m", limit: 96 },
+  "1W": { interval: "1h", limit: 168 },
+  "1M": { interval: "4h", limit: 180 },
   "6M": { interval: "1d", limit: 180 },
   "1Y": { interval: "1d", limit: 365 },
   YTD: { interval: "1d", limit: 0 },
-  All: { interval: "1w", limit: 200 },
+  // Binance's max; covers every supported token's full weekly history.
+  All: { interval: "1w", limit: 1000 },
 };
 
+// A token's chart for a range: real candle closes with their times, oldest
+// first, at most CHART_POINTS of them. Cached per range (chartSeries.ts).
 export const getChartData = action({
   args: {
     symbol: v.string(),
     interval: v.string(),
   },
-  handler: async (ctx, args): Promise<{
-    closes: number[];
-    basePrice: number;
-    latestPrice: number;
-    minPrice: number;
-    maxPrice: number;
-  } | null> => {
+  returns: v.union(v.array(chartPointValidator), v.null()),
+  handler: async (ctx, args): Promise<ChartPoint[] | null> => {
     if (!SUPPORTED_SYMBOLS.has(args.symbol)) return null;
+    const config = INTERVAL_CONFIG[args.interval];
+    if (!config) return null;
 
-    const cached: {
-      closes: number[];
-      basePrice: number;
-      latestPrice: number;
-      minPrice: number;
-      maxPrice: number;
-    } | null = await ctx.runQuery(internal.chartCache.get, {
+    const cached = await ctx.runQuery(internal.chartSeries.get, {
       symbol: args.symbol,
       interval: args.interval,
     });
     if (cached) return cached;
 
-    const config = INTERVAL_CONFIG[args.interval];
-    if (!config) return null;
-
     let limit = config.limit;
     if (args.interval === "YTD") {
       const now = new Date();
       const yearStart = new Date(now.getFullYear(), 0, 1);
-      limit = Math.ceil(
-        (now.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24),
+      limit = Math.max(
+        1,
+        Math.ceil(
+          (now.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24),
+        ),
       );
     }
 
@@ -70,24 +70,18 @@ export const getChartData = action({
     const res = await fetchBinance(url);
     if (!res?.ok) return null;
 
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) return null;
+    const points = downsample(
+      parseKlines(await res.json(), Date.now()),
+      CHART_POINTS,
+    );
+    if (points.length === 0) return null;
 
-    const closes = data.map((c: string[]) => parseFloat(c[4]));
-    const basePrice = closes[0];
-    const latestPrice = closes[closes.length - 1];
-    const minPrice = Math.min(...closes);
-    const maxPrice = Math.max(...closes);
-
-    const result = { closes, basePrice, latestPrice, minPrice, maxPrice };
-
-    await ctx.runMutation(internal.chartCache.set, {
+    await ctx.runMutation(internal.chartSeries.set, {
       symbol: args.symbol,
       interval: args.interval,
-      ...result,
+      points,
     });
-
-    return result;
+    return points;
   },
 });
 
@@ -149,35 +143,6 @@ export const getBetChart = action({
     if (times.length > 0) times[times.length - 1] = end;
 
     return { times, closes };
-  },
-});
-
-export const getPrice = action({
-  args: { symbol: v.string() },
-  handler: async (_ctx, args) => {
-    if (!SUPPORTED_SYMBOLS.has(args.symbol)) return null;
-
-    const res = await fetchBinance(
-      binanceApiUrl(
-        `/api/v3/ticker/24hr?symbol=${toBinanceSymbol(args.symbol)}`,
-      ),
-    );
-    if (!res?.ok) return null;
-
-    const data = await res.json();
-    const price = parseFloat(data.lastPrice);
-    if (isNaN(price)) return null;
-
-    return {
-      price,
-      priceChange24h: parseFloat(data.priceChangePercent) || 0,
-      priceChangeAbs24h: parseFloat(data.priceChange) || 0,
-      open24h: parseFloat(data.openPrice) || 0,
-      high24h: parseFloat(data.highPrice) || 0,
-      low24h: parseFloat(data.lowPrice) || 0,
-      volume: parseFloat(data.quoteVolume) || 0,
-      symbol: args.symbol,
-    };
   },
 });
 

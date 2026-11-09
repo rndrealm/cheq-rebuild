@@ -17,9 +17,6 @@ import { cn } from "@/lib/utils";
 const RANGES = ["1D", "1W", "1M", "6M", "1Y", "All"] as const;
 type Range = (typeof RANGES)[number];
 
-const COLOR_UP = "#47a95e";
-const COLOR_DOWN = "#e4813f";
-
 const spring = { type: "spring" as const, duration: 0.45, bounce: 0.02 };
 
 // Raised grey surface shared by the toolbar buttons and the stats card.
@@ -53,7 +50,9 @@ export function TokenChartPanel({ symbol }: { symbol: string }) {
     useChartInteraction(true, chart, addVelocity);
 
   const lineColor =
-    chart && chart.latestPrice < chart.basePrice ? COLOR_DOWN : COLOR_UP;
+    chart && chart.latestPrice < chart.basePrice
+      ? "var(--price-down)"
+      : "var(--price-up)";
 
   return (
     <section className="relative flex h-108.25 min-w-0 flex-col">
@@ -97,7 +96,7 @@ export function TokenChartPanel({ symbol }: { symbol: string }) {
             <span className="text-[32px] leading-8 tabular-nums text-fg-base">
               {formatPrice(stats.price)}
             </span>
-            <TodayChange stats={stats} />
+            <Change24h stats={stats} />
           </>
         ) : (
           <div className="h-8 w-44 animate-pulse rounded-lg bg-gray-4" />
@@ -126,7 +125,7 @@ export function TokenChartPanel({ symbol }: { symbol: string }) {
                 initial={false}
                 animate={{ d: chart.path }}
                 transition={spring}
-                stroke={lineColor}
+                style={{ stroke: lineColor }}
                 strokeWidth={2}
                 strokeLinecap="round"
                 fill="none"
@@ -142,7 +141,13 @@ export function TokenChartPanel({ symbol }: { symbol: string }) {
                   top: `${crosshair.normY * 100}%`,
                 }}
               >
-                <span className="absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[1px_2px_4px_0px_rgba(71,169,94,0.25)]" />
+                <span
+                  className="absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+                  // Tinted to match the line, at 25% opacity
+                  style={{
+                    boxShadow: `1px 2px 4px 0px color-mix(in srgb, ${lineColor} 25%, transparent)`,
+                  }}
+                />
                 <ChartTooltip
                   ref={tooltipRef}
                   crosshair={crosshair}
@@ -180,7 +185,8 @@ export function TokenChartPanel({ symbol }: { symbol: string }) {
   );
 }
 
-function TodayChange({ stats }: { stats: TokenStats }) {
+// Binance's rolling 24h change, so "in 24h" rather than "today".
+function Change24h({ stats }: { stats: TokenStats }) {
   const up = stats.priceChange24h >= 0;
   const sign = up ? "+" : "-";
   const amount = formatPrice(Math.abs(stats.priceChangeAbs24h)).replace("$", "");
@@ -188,12 +194,12 @@ function TodayChange({ stats }: { stats: TokenStats }) {
     <span
       className={cn(
         "text-sm leading-5 tabular-nums",
-        up ? "text-[#47a95e]" : "text-destructive",
+        up ? "text-price-up" : "text-price-down",
       )}
     >
       {sign}
       {amount} ({sign}
-      {Math.abs(stats.priceChange24h).toFixed(2)}%) today
+      {Math.abs(stats.priceChange24h).toFixed(2)}%) in 24h
     </span>
   );
 }

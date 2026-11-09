@@ -32,6 +32,12 @@ export const ChartTooltip = forwardRef<HTMLDivElement, ChartTooltipProps>(
               ? `+${crosshair.change.toFixed(2)}%`
               : `-${Math.abs(crosshair.change).toFixed(2)}%`}
           </div>
+          {/* Hidden for now: the label jumps as hover snaps between candles.
+          {crosshair.timeLabel && (
+            <div className="mt-0.5 text-[11px] font-medium leading-3.5 text-[#a3a3a3]">
+              {crosshair.timeLabel}
+            </div>
+          )} */}
         </div>
         <div className="mx-auto -mt-px h-0 w-0 border-x-[6px] border-t-[6px] border-x-transparent border-t-[#F3F3F3]" />
       </div>

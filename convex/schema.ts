@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { chartPointValidator } from "./lib/chart";
 
 export default defineSchema({
   users: defineTable({
@@ -208,14 +209,13 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_userId_read", ["userId", "read"]),
 
-  chartCache: defineTable({
+  // Cached token chart per range ("1D", "1W", …): real Binance candles,
+  // downsampled to at most CHART_POINTS. Refetched once older than the
+  // range's TTL (see chartSeries.ts).
+  chartSeries: defineTable({
     symbol: v.string(),
     interval: v.string(),
-    closes: v.array(v.number()),
-    basePrice: v.number(),
-    latestPrice: v.number(),
-    minPrice: v.number(),
-    maxPrice: v.number(),
+    points: v.array(chartPointValidator),
     fetchedAt: v.number(),
   }).index("by_symbol_and_interval", ["symbol", "interval"]),
 });

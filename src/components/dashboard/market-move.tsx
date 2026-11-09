@@ -160,8 +160,8 @@ export function MarketMove() {
                 line.change === undefined
                   ? "text-fg-base"
                   : line.change >= 0
-                    ? "text-[#47a95e]"
-                    : "text-destructive",
+                    ? "text-price-up"
+                    : "text-price-down",
               )}
             >
               {line.value}

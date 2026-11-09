@@ -37,6 +37,10 @@
   --info: #425eb9;
   --info-light: #b0ccff;
 
+  /* Market moves: a price going up / down */
+  --price-up: #47a95e;
+  --price-down: #e4813f;
+
   /* Grey palette (oklch neutrals) */
   --gray-1: oklch(0.993 0.002 256);
   --gray-2: oklch(0.982 0.002 256);
@@ -120,6 +124,8 @@
   --color-warning-light: var(--warning-light);
   --color-info: var(--info);
   --color-info-light: var(--info-light);
+  --color-price-up: var(--price-up);
+  --color-price-down: var(--price-down);
 
   --color-gray-1: var(--gray-1);
   --color-gray-2: var(--gray-2);

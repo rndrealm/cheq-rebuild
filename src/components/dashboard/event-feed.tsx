@@ -14,8 +14,6 @@ const CARD_CLASS =
   "w-full overflow-hidden rounded-[20px] border border-border bg-card";
 const CARD_SHADOW = { boxShadow: "0px 4px 20px 0px #00000014" };
 
-const COLOR_UP = "#47a95e";
-const COLOR_DOWN = "var(--loss-9)";
 
 /**
  * Dashboard feed: the latest checkpoints across all bets, as one line of text
@@ -99,7 +97,7 @@ function Sparkline({ symbol }: { symbol: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
-        style={{ stroke: up ? COLOR_UP : COLOR_DOWN }}
+        style={{ stroke: up ? "var(--price-up)" : "var(--price-down)" }}
       />
     </svg>
   );

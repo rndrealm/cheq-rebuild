@@ -345,8 +345,8 @@ export function TokenCard({
                           className={cn(
                             "whitespace-nowrap text-sm font-semibold leading-5",
                             crosshair.change >= 0
-                              ? "text-[#47a95e]"
-                              : "text-destructive",
+                              ? "text-price-up"
+                              : "text-price-down",
                           )}
                         />
                       </span>
