@@ -15,7 +15,8 @@ export function GoogleButton({
   onClick?: () => void;
   pending?: boolean;
 }) {
-  const slotMotion = useSlotButtonMotion();
+  // Ghost button: wait for Continue to leave rather than show through it
+  const slotMotion = useSlotButtonMotion({ waitForExit: true });
   return (
     <motion.button
       type="button"
