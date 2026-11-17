@@ -15,6 +15,7 @@ export function PasswordField({
   onValueChange,
   autoComplete,
   minLength,
+  pattern,
   onEscape,
   busy,
   errorId,
@@ -24,7 +25,9 @@ export function PasswordField({
   value: string;
   onValueChange: (value: string) => void;
   autoComplete: "current-password" | "new-password";
+  // The rules for a new password (sign-up); none when signing in
   minLength?: number;
+  pattern?: string;
   onEscape?: () => void;
   busy?: boolean;
   errorId?: string;
@@ -42,6 +45,7 @@ export function PasswordField({
         autoFocus
         required
         minLength={minLength}
+        pattern={pattern}
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
         onKeyDown={(e) => {

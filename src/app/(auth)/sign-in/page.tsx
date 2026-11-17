@@ -11,10 +11,9 @@ import { ContinueButton } from "@/components/auth/continue-button";
 import { GoogleButton } from "@/components/auth/google-button";
 import { EmailField } from "@/components/auth/fields/email-field";
 import { PasswordField } from "@/components/auth/fields/password-field";
-import { emailReason, isValidEmail } from "@/components/auth/validation";
+import { isValidEmail } from "@/components/auth/validation";
 import { useAuthStep } from "@/components/auth/hooks/use-auth-step";
 import { useGoogleSignIn } from "@/components/auth/hooks/use-google-sign-in";
-import { useReasonFlash } from "@/components/auth/hooks/use-reason-flash";
 import { useStepError } from "@/components/auth/hooks/use-step-error";
 import {
   SIGN_IN_FIELDS_KEY,
@@ -42,8 +41,6 @@ export default function SignInPage() {
   const { error, setError } = useStepError(step);
   const [loading, setLoading] = useState(false);
   const google = useGoogleSignIn(setError);
-  // Shows the disabled button's reason after Enter on an email not valid yet
-  const [reasonShown, flashReason] = useReasonFlash();
 
   async function signInWithPassword() {
     setError("");
@@ -67,10 +64,10 @@ export default function SignInPage() {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (loading) return;
-    // The form skips the browser's own validation (its grey tooltip doesn't
-    // fit the design), so check here: not valid yet, show the reason instead
+    // Not valid yet (no button until the email is valid; an empty password):
+    // the browser's own message points at the field
     if (!e.currentTarget.checkValidity()) {
-      flashReason();
+      e.currentTarget.reportValidity();
       return;
     }
     if (step === "email") go("password");
@@ -96,9 +93,9 @@ export default function SignInPage() {
 
   const errorId = error ? ERROR_ID : undefined;
 
-  // What sits under the field: the error; the step's button once there's
-  // something in the field; otherwise Google (email) or which account this is
-  // (password)
+  // What sits under the field: the error; Continue once the email is valid
+  // (Google until then); on the password step, Sign in once something's typed
+  // (which account this is until then)
   function slot() {
     if (error) {
       return (
@@ -107,15 +104,8 @@ export default function SignInPage() {
         </SlotText>
       );
     }
-    if (step === "email" && email) {
-      return (
-        <ContinueButton
-          key="continue"
-          form={FORM_ID}
-          disabledReason={emailReason(email)}
-          reasonShown={reasonShown}
-        />
-      );
+    if (step === "email" && isValidEmail(email)) {
+      return <ContinueButton key="continue" form={FORM_ID} />;
     }
     if (step === "email") {
       return (
