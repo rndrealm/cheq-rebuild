@@ -4,8 +4,8 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
-import { BetCarousel } from "@/components/dashboard/bet-carousel";
-import { CARD_HEIGHT, CARD_WIDTH } from "@/components/dashboard/bet-carousel-card";
+import { BetCarousel } from "@/components/feed/bet-carousel";
+import { CARD_HEIGHT, CARD_WIDTH } from "@/components/feed/bet-carousel-card";
 import {
   HeaderTransition,
   PageTransition,

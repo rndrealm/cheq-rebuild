@@ -13,7 +13,7 @@ import {
   BetCarouselCard,
   CARD_HEIGHT,
   CARD_WIDTH,
-} from "@/components/dashboard/bet-carousel-card";
+} from "@/components/feed/bet-carousel-card";
 import { useDrag } from "@/hooks/use-drag";
 import type { FeedBet } from "@/lib/helpers/bets";
 import {
