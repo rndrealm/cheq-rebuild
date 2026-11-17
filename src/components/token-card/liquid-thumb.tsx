@@ -60,7 +60,7 @@ export function LiquidThumb({ normX, isDragging }: LiquidThumbProps) {
                 position: "absolute",
                 inset: 0,
                 borderRadius: "50%",
-                boxShadow: "inset 0 0 3px 4px #47a95e",
+                boxShadow: "inset 0 0 3px 4px var(--price-up)",
                 opacity: Math.min(1, normX * 2),
               }}
             />
@@ -71,7 +71,7 @@ export function LiquidThumb({ normX, isDragging }: LiquidThumbProps) {
                 width: BAR_W,
                 top: "50%",
                 left: 0,
-                background: "#47a95e",
+                background: "var(--price-up)",
                 borderRadius: 100,
                 transform: `translate(${-BAR_W + normX * THUMB_SIZE}px, -50%)`,
               }}

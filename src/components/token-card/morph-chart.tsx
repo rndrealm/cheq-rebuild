@@ -105,7 +105,7 @@ export function MorphChart({
           >
             <stop
               offset={`${(expanded ? crosshair.normX : 0) * 100}%`}
-              stopColor="#47a95e"
+              style={{ stopColor: "var(--price-up)" }}
             />
             <stop
               offset={`${(expanded ? crosshair.normX : 0) * 100}%`}

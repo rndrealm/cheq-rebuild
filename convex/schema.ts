@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { chartPointValidator } from "./lib/chart";
 
 export default defineSchema({
   users: defineTable({
@@ -123,9 +124,29 @@ export default defineSchema({
     progress: v.optional(v.number()),
     // lead_change: who just took the lead.
     leader: v.optional(v.union(v.literal("creator"), v.literal("opponent"))),
+    // The bet's players, copied here so each player's checkpoints can be
+    // listed by index. Optional only for events recorded before this was
+    // added (backfilled by checkpoints.backfillPlayers).
+    creatorId: v.optional(v.id("users")),
+    opponentId: v.optional(v.id("users")),
   })
     .index("by_betId_and_key", ["betId", "key"])
-    .index("by_at", ["at"]),
+    .index("by_creatorId_and_at", ["creatorId", "at"])
+    .index("by_opponentId_and_at", ["opponentId", "at"]),
+
+  // Latest price and 24h stats per supported token, from Binance. One row per
+  // token, overwritten by the checkpoint poller every 30s (see market.ts).
+  marketPrices: defineTable({
+    symbol: v.string(),
+    price: v.number(),
+    priceChange24h: v.number(),
+    priceChangeAbs24h: v.number(),
+    open24h: v.number(),
+    high24h: v.number(),
+    low24h: v.number(),
+    volume: v.number(),
+    updatedAt: v.number(),
+  }).index("by_symbol", ["symbol"]),
 
   rivalries: defineTable({
     userAId: v.id("users"),
@@ -194,14 +215,13 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_userId_read", ["userId", "read"]),
 
-  chartCache: defineTable({
+  // Cached token chart per range ("1D", "1W", …): real Binance candles,
+  // downsampled to at most CHART_POINTS. Refetched once older than the
+  // range's TTL (see chartSeries.ts).
+  chartSeries: defineTable({
     symbol: v.string(),
     interval: v.string(),
-    closes: v.array(v.number()),
-    basePrice: v.number(),
-    latestPrice: v.number(),
-    minPrice: v.number(),
-    maxPrice: v.number(),
+    points: v.array(chartPointValidator),
     fetchedAt: v.number(),
   }).index("by_symbol_and_interval", ["symbol", "interval"]),
 });

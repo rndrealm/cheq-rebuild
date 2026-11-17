@@ -4,7 +4,7 @@ import schema from "../schema";
 import { api, internal } from "../_generated/api";
 import { modules } from "../test.setup";
 import { TEST_TOKEN } from "./helpers";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { REGISTRATION_BONUS, MIN_WAGER, MAX_ACTIVE_BETS } from "../lib/constants";
 
 async function seedTwoUsers(t: ReturnType<typeof convexTest>) {
@@ -664,33 +664,34 @@ describe("bets", () => {
     });
   });
 
-  describe("myActive", () => {
-    async function insertBet(
-      t: ReturnType<typeof convexTest>,
-      bet: {
-        creatorId: Id<"users">;
-        opponentId?: Id<"users">;
-        status: "pending" | "active" | "resolved";
-        resolvesAt: number;
-      },
-    ) {
-      return await t.run(async (ctx) =>
-        ctx.db.insert("bets", {
-          ...bet,
-          type: "up_down",
-          token: TEST_TOKEN,
-          betTerms: { direction: "up" },
-          creatorWager: 10,
-          opponentWager: 20,
-          priceAtCreation: 0.001,
-          duration: "1h",
-          expiresAt: bet.resolvesAt,
-          counterCount: 0,
-          updatedAt: 0,
-        }),
-      );
-    }
+  // Inserts a bet directly, skipping the create flow.
+  async function insertBet(
+    t: ReturnType<typeof convexTest>,
+    bet: {
+      creatorId: Id<"users">;
+      opponentId?: Id<"users">;
+      status: Doc<"bets">["status"];
+      resolvesAt: number;
+    },
+  ) {
+    return await t.run(async (ctx) =>
+      ctx.db.insert("bets", {
+        ...bet,
+        type: "up_down",
+        token: TEST_TOKEN,
+        betTerms: { direction: "up" },
+        creatorWager: 10,
+        opponentWager: 20,
+        priceAtCreation: 0.001,
+        duration: "1h",
+        expiresAt: bet.resolvesAt,
+        counterCount: 0,
+        updatedAt: 0,
+      }),
+    );
+  }
 
+  describe("myActive", () => {
     test("returns [] when logged out", async () => {
       const t = convexTest({ schema, modules });
       const { aliceId, bobId } = await seedTwoUsers(t);
@@ -758,6 +759,112 @@ describe("bets", () => {
 
       const asCarol = t.withIdentity({ subject: "auth_carol" });
       expect(await asCarol.query(api.bets.myActive, {})).toEqual([]);
+    });
+  });
+
+  describe("mine", () => {
+    test("returns [] when logged out", async () => {
+      const t = convexTest({ schema, modules });
+      const { aliceId, bobId } = await seedTwoUsers(t);
+      await insertBet(t, {
+        creatorId: aliceId,
+        opponentId: bobId,
+        status: "active",
+        resolvesAt: 1000,
+      });
+
+      expect(await t.query(api.bets.mine, {})).toEqual([]);
+    });
+
+    test("returns the caller's bets from both sides, newest first, with names", async () => {
+      const t = convexTest({ schema, modules });
+      const { aliceId, bobId, asAlice } = await seedTwoUsers(t);
+
+      const first = await insertBet(t, {
+        creatorId: aliceId,
+        status: "pending",
+        resolvesAt: 1000,
+      });
+      const second = await insertBet(t, {
+        creatorId: bobId,
+        opponentId: aliceId,
+        status: "resolved",
+        resolvesAt: 1000,
+      });
+
+      const bets = await asAlice.query(api.bets.mine, {});
+      expect(bets.map((b) => b._id)).toEqual([second, first]);
+      expect(bets[0]).toMatchObject({
+        creator: { username: "bob" },
+        opponent: { username: "alice" },
+      });
+      expect(bets[1]).toMatchObject({
+        creator: { username: "alice" },
+        opponent: null,
+      });
+    });
+
+    test("doesn't return other users' bets", async () => {
+      const t = convexTest({ schema, modules });
+      const { aliceId, bobId } = await seedTwoUsers(t);
+      await t.mutation(internal.users.create, {
+        authId: "auth_carol",
+        name: "Carol",
+        username: "carol",
+      });
+      await insertBet(t, {
+        creatorId: aliceId,
+        opponentId: bobId,
+        status: "active",
+        resolvesAt: 1000,
+      });
+
+      const asCarol = t.withIdentity({ subject: "auth_carol" });
+      expect(await asCarol.query(api.bets.mine, {})).toEqual([]);
+    });
+  });
+
+  describe("myBalance", () => {
+    test("is null when logged out", async () => {
+      const t = convexTest({ schema, modules });
+      await seedTwoUsers(t);
+      expect(await t.query(api.bets.myBalance, {})).toBeNull();
+    });
+
+    test("adds the caller's stake in live, open and flagged bets", async () => {
+      const t = convexTest({ schema, modules });
+      const { aliceId, bobId, asAlice } = await seedTwoUsers(t);
+      const resolvesAt = 1000;
+
+      // Created by Alice (stake 10 each): held while live, open or flagged.
+      for (const status of ["active", "pending", "countered", "flagged"] as const) {
+        await insertBet(t, { creatorId: aliceId, opponentId: bobId, status, resolvesAt });
+      }
+      // Joined by Alice (stake 20 each): held while live or flagged.
+      for (const status of ["active", "flagged"] as const) {
+        await insertBet(t, { creatorId: bobId, opponentId: aliceId, status, resolvesAt });
+      }
+      // Nothing held: finished bets, and challenges Alice hasn't accepted.
+      for (const status of ["resolved", "tied", "expired", "cancelled"] as const) {
+        await insertBet(t, { creatorId: aliceId, opponentId: bobId, status, resolvesAt });
+      }
+      await insertBet(t, { creatorId: bobId, opponentId: aliceId, status: "pending", resolvesAt });
+
+      const points = await t.run(async (ctx) => (await ctx.db.get(aliceId))!.points);
+      expect(await asAlice.query(api.bets.myBalance, {})).toEqual({
+        available: points,
+        locked: 4 * 10 + 2 * 20,
+        total: points + 80,
+      });
+    });
+
+    test("doesn't count other users' bets", async () => {
+      const t = convexTest({ schema, modules });
+      const { aliceId, asBob } = await seedTwoUsers(t);
+      await insertBet(t, { creatorId: aliceId, status: "pending", resolvesAt: 1000 });
+
+      const balance = await asBob.query(api.bets.myBalance, {});
+      expect(balance?.locked).toBe(0);
     });
   });
 });

@@ -15,6 +15,7 @@ Issues found while reviewing how bets are created, priced and resolved (`convex/
   - Opponent counters **down** (creator locked 200, counter to 50): on cancel the creator gets back only 50, so 150 points disappear.
   - The creator's balance isn't checked when the opponent raises the wager.
 - **The counter-party never agrees.** `accept` only checks "not the creator, and the named opponent if set", so the opponent can accept their *own* counter-offer immediately. The creator can't accept a counter at all, because creators can't call `accept`.
+- **The home balance is wrong too.** `bets.myBalance` counts `creatorWager` as held for open challenges, so after an opponent's counter the creator's Total Balance includes points that were never taken from them (or leaves out points that were).
 - **Root cause:** the bet doesn't record who made the latest offer, or what each side has actually locked versus what's proposed.
 
 **What the review should cover:**
@@ -31,10 +32,28 @@ Issues found while reviewing how bets are created, priced and resolved (`convex/
 #### 8. Flagged bets have no recovery path
 If fetching the price fails after all retries, the bet is set to `flagged` (`flagBet` in [convex/resolutionHelpers.ts](convex/resolutionHelpers.ts)). Nothing ever settles or refunds a flagged bet, so the wagers stay locked for good. The `"manual"` value for `resolvedVia` exists in the schema but is never used.
 
+Until then, `bets.myBalance` counts both players' stakes in flagged bets as held, so they stay in each player's Total Balance rather than vanishing from it.
+
 **Fix:** add an admin or internal function to settle or refund manually, and/or retry on a schedule.
 
+#### 16. Public bet queries expose any user's bets
+Four queries in [convex/bets.ts](convex/bets.ts) are raw `query` with no auth check. The ESLint rule only blocks raw `mutation` / `action`, so nothing flagged them.
+- **`listByUser`** takes a `userId`: anyone, logged out included, can list any user's bets with wagers and terms, unbounded (`.collect()`). No callers.
+- **`getById`**: any bet by ID. No callers.
+- **`feed`**: the newest 50 bets of all users with both players' names. No callers.
+- **`detail`**: any bet by ID with both players' names; used by the bet page ([src/app/(protected)/bet/[id]/page.tsx](src/app/(protected)/bet/[id]/page.tsx)).
+
+**Fix:** delete `listByUser`, `getById` and `feed`. Decide who can see a bet in `detail`: the two players, plus anyone while it's an open challenge with no named opponent (so a shared link can still be accepted). Add `query` to the ESLint rule's blocked names so new public queries need an explicit opt-out.
+
+### Medium
+
+#### 17. `bets.mine` reads every bet the user has ever made
+`bets.mine` (Feed, and prefetched by the Home layout so Feed opens instantly) uses `.collect()` on both sides with no limit and looks up each player one at a time. It grows with the user's whole history and re-runs on every change to any of their bets. Home also runs `bets.myBalance` separately, so Home now does both.
+
+**Fix:** paginate or limit Feed (e.g. live and open bets plus the most recent finished ones), then decide whether the Home layout should keep prefetching it.
+
 ### Suggested fix order
-3 (or its interim option) first (point balances), then 8.
+3 (or its interim option) first (point balances), then 16 (data exposure), then 8, then 17.
 
 ## Future review
 
@@ -129,6 +148,11 @@ Checked Nov 2026 via CoinGecko's list of Binance.US pairs (Binance.US blocks non
 **Was:** `notifications.listByUser` / `listUnread` / `unreadCount` and `points.listByUser` took a `userId`, so anyone could read anyone's notifications and point history.
 
 **Fix:** they're now `notifications.list` / `unread` / `unreadCount` and `points.list`, with no `userId` argument. They use the new `optionalAuthQuery` builder ([convex/lib/functions.ts](convex/lib/functions.ts)) and return the caller's own data, or an empty result when logged out (so live queries don't error during sign-out). Nothing in the frontend called them yet.
+
+#### 18. Anyone could read any user's bets through `bets.feedForUser`
+**Was:** `feedForUser` was a raw `query` taking a `userId`, so any caller could list another user's bets. It powered Feed, the Home layout's prefetch and the Home balance. The balance's locking rules were also copied on the client (`getLockedPoints`), which counted flagged stakes as 0.
+
+**Fix:** replaced by `bets.mine` (`optionalAuthQuery`, no arguments, the caller's own bets, `[]` when logged out). The Home balance uses the new `bets.myBalance`, which sums held points on the server from the status indexes; `getLockedPoints` is removed. Both have tests for the logged-out and other-user cases.
 
 #### `hit_price` XP awarded outside the settlement transaction (part of #10)
 **Fix (with #2):** `settleTouch` / `settleTouchDeadline` award XP in the same transaction via `applyBetXp()`, so overlapping poller runs can't double-award. Snapshot settlement is deferred; see Future review.

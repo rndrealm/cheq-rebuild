@@ -1,14 +1,8 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
-import { animate } from 'motion/react';
-import {
-  COLORS,
-  FRAME_D,
-  FACE_D,
-  PATHS,
-  IDLE_ANIMATIONS,
-} from '@/lib/avatar-shapes';
+import { useId } from 'react';
+import { COLORS, FRAME_D, FACE_D } from '@/lib/avatar-shapes';
+import { useAvatarExpression } from '@/hooks/use-avatar-expression';
 
 interface AvatarProps {
   expressionIndex?: number;
@@ -24,81 +18,9 @@ export function Avatar({
   className,
 }: AvatarProps) {
   const uid = useId();
-  const leftRef = useRef<SVGPathElement>(null);
-  const rightRef = useRef<SVGPathElement>(null);
-  const mouthRef = useRef<SVGPathElement>(null);
-  const prevExprRef = useRef(expressionIndex);
-  const stopRef = useRef<(() => void) | null>(null);
+  const { leftRef, rightRef, mouthRef } = useAvatarExpression(expressionIndex);
 
   const color = COLORS[colorIndex] ?? COLORS[0];
-
-  useEffect(() => {
-    const left = leftRef.current;
-    const right = rightRef.current;
-    const mouth = mouthRef.current;
-    if (!left || !right || !mouth) return;
-
-    if (stopRef.current) {
-      stopRef.current();
-      stopRef.current = null;
-    }
-
-    const newPaths = PATHS[expressionIndex];
-    const idle = IDLE_ANIMATIONS[expressionIndex];
-    const changed = prevExprRef.current !== expressionIndex;
-    prevExprRef.current = expressionIndex;
-
-    // motion 13's animate(el, { d }) doesn't write an SVG path's `d` attribute, so the
-    // path strings are tweened as values (every path shares one structure) and set here
-    const morph = (
-      el: SVGPathElement,
-      keyframes: string | string[],
-      options: { duration: number; times?: number[]; repeat?: number; ease?: 'linear' }
-    ) =>
-      animate(el.getAttribute('d') ?? '', keyframes, {
-        ...options,
-        onUpdate: (d) => el.setAttribute('d', d),
-      });
-
-    const startIdle = () => {
-      const idleOptions = {
-        duration: idle.duration,
-        times: idle.times,
-        repeat: Infinity,
-        ease: 'linear' as const,
-      };
-      const cL = morph(left, idle.left, idleOptions);
-      const cR = morph(right, idle.right, idleOptions);
-      stopRef.current = () => {
-        cL.stop();
-        cR.stop();
-      };
-    };
-
-    if (changed) {
-      const cL = morph(left, newPaths.left, { duration: 0.4 });
-      const cR = morph(right, newPaths.right, { duration: 0.4 });
-      const cM = morph(mouth, newPaths.mouth, { duration: 0.4 });
-      stopRef.current = () => {
-        cL.stop();
-        cR.stop();
-        cM.stop();
-      };
-      void Promise.all([cL, cR, cM]).then(startIdle);
-    } else {
-      left.setAttribute('d', newPaths.left);
-      right.setAttribute('d', newPaths.right);
-      mouth.setAttribute('d', newPaths.mouth);
-      startIdle();
-    }
-
-    return () => {
-      if (stopRef.current) {
-        stopRef.current();
-        stopRef.current = null;
-      }
-    };
-  }, [expressionIndex]);
 
   const fillId = `avatar-fill${uid}`;
   const borderId = `avatar-border${uid}`;
@@ -150,6 +72,42 @@ export function Avatar({
       <path ref={leftRef} fill={`url(#${fillId})`} />
       <path ref={rightRef} fill={`url(#${fillId})`} />
       <path ref={mouthRef} fill={`url(#${fillId})`} />
+    </svg>
+  );
+}
+
+/**
+ * Just the avatar character in one colour (`currentColor`), with the face cut
+ * out so whatever is behind shows through it, and live eyes and mouth. Fills a
+ * box the size of the frame (it sits at 4..36 in the 40px avatar).
+ */
+export function AvatarGlyph({
+  expressionIndex = 0,
+  idleDelay,
+  className,
+}: {
+  expressionIndex?: number;
+  idleDelay?: number;
+  className?: string;
+}) {
+  const uid = useId();
+  const maskId = `avatar-glyph-face${uid}`;
+  const { leftRef, rightRef, mouthRef } = useAvatarExpression(expressionIndex, {
+    idleDelay,
+  });
+
+  return (
+    <svg viewBox="4 4 32 32" fill="none" className={className}>
+      <defs>
+        <mask id={maskId} maskUnits="userSpaceOnUse" x="4" y="4" width="32" height="32">
+          <path d={FRAME_D} fill="white" />
+          <path d={FACE_D} fill="black" />
+        </mask>
+      </defs>
+      <rect x="4" y="4" width="32" height="32" fill="currentColor" mask={`url(#${maskId})`} />
+      <path ref={leftRef} fill="currentColor" />
+      <path ref={rightRef} fill="currentColor" />
+      <path ref={mouthRef} fill="currentColor" />
     </svg>
   );
 }

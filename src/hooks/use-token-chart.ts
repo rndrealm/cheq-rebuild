@@ -1,75 +1,110 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { toPathD, resample, NUM_POINTS } from "@/lib/helpers/chart";
+import {
+  CHART_TTL_MS,
+  DEFAULT_CHART_TTL_MS,
+  type ChartPoint as Candle,
+} from "../../convex/lib/chart";
+import { useTokenStats } from "@/hooks/use-market";
+import {
+  toChartData,
+  withLivePrice,
+  type ChartData,
+} from "@/lib/helpers/chart";
 
-export type ChartData = {
-  points: number[];
-  path: string;
-  minPrice: number;
-  maxPrice: number;
-  basePrice: number;
-  latestPrice: number;
-};
+export type { ChartData };
 
-function normalizeCloses(
-  closes: number[],
-  minPrice: number,
-  maxPrice: number,
-): number[] {
-  const range = maxPrice - minPrice || 1;
-  return closes.map((c) => 0.1 + ((maxPrice - c) / range) * 0.8);
-}
+// How often to check whether a requested range is due a refresh.
+const CHECK_MS = 30_000;
 
+/**
+ * A token's chart per range ("1D", "1W", …), fetched on first request. Kept
+ * live: the last point follows the market snapshot (updated every 30s by the
+ * cron), and each requested range is refetched once its server cache expires
+ * so the window moves forward. Refreshing pauses while the tab is hidden.
+ */
 export function useTokenChart(symbol: string) {
-  const [data, setData] = useState<Record<string, ChartData>>({});
-  const [loading, setLoading] = useState(false);
+  // Candles per `${symbol}:${interval}`.
+  const [series, setSeries] = useState<Record<string, Candle[]>>({});
   const getChartData = useAction(api.tokens.getChartData);
-  const fetchedRef = useRef<Set<string>>(new Set());
+  const stats = useTokenStats(symbol);
 
-  const fetchInterval = useCallback(
+  const requested = useRef(new Set<string>());
+  const inFlight = useRef(new Set<string>());
+  const fetchedAt = useRef(new Map<string, number>());
+
+  const load = useCallback(
     async (interval: string) => {
       const key = `${symbol}:${interval}`;
-      if (fetchedRef.current.has(key)) return;
-      fetchedRef.current.add(key);
-
-      setLoading(true);
+      if (inFlight.current.has(key)) return;
+      inFlight.current.add(key);
       try {
-        const result = await getChartData({ symbol, interval });
-        if (!result) {
-          setLoading(false);
-          return;
+        const candles = await getChartData({ symbol, interval });
+        if (candles?.length) {
+          fetchedAt.current.set(key, Date.now());
+          setSeries((prev) => ({ ...prev, [key]: candles }));
         }
-
-        const resampled = resample(result.closes, NUM_POINTS);
-        const points = normalizeCloses(
-          resampled,
-          result.minPrice,
-          result.maxPrice,
-        );
-        const path = toPathD(points);
-
-        setData((prev) => ({
-          ...prev,
-          [interval]: {
-            points,
-            path,
-            minPrice: result.minPrice,
-            maxPrice: result.maxPrice,
-            basePrice: result.basePrice,
-            latestPrice: result.latestPrice,
-          },
-        }));
       } catch {
-        fetchedRef.current.delete(key);
+        // Retried by the refresh check.
       } finally {
-        setLoading(false);
+        inFlight.current.delete(key);
       }
     },
     [symbol, getChartData],
   );
 
-  return { data, loading, fetchInterval };
+  const fetchInterval = useCallback(
+    async (interval: string) => {
+      const key = `${symbol}:${interval}`;
+      if (requested.current.has(key)) return;
+      requested.current.add(key);
+      await load(interval);
+    },
+    [symbol, load],
+  );
+
+  // Refetch requested ranges whose cache has expired (or whose fetch failed).
+  useEffect(() => {
+    const prefix = `${symbol}:`;
+    const refresh = () => {
+      if (document.hidden) return;
+      for (const key of requested.current) {
+        if (!key.startsWith(prefix)) continue;
+        const interval = key.slice(prefix.length);
+        const ttl = CHART_TTL_MS[interval] ?? DEFAULT_CHART_TTL_MS;
+        if (Date.now() - (fetchedAt.current.get(key) ?? 0) >= ttl) {
+          void load(interval);
+        }
+      }
+    };
+    const id = setInterval(refresh, CHECK_MS);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [symbol, load]);
+
+  const livePrice = stats?.price;
+  const liveAt = stats?.updatedAt;
+
+  const data = useMemo(() => {
+    const live =
+      livePrice !== undefined && liveAt !== undefined
+        ? { price: livePrice, updatedAt: liveAt }
+        : null;
+    const prefix = `${symbol}:`;
+    const charts: Record<string, ChartData> = {};
+    for (const [key, candles] of Object.entries(series)) {
+      if (!key.startsWith(prefix)) continue;
+      const chart = toChartData(withLivePrice(candles, live));
+      if (chart) charts[key.slice(prefix.length)] = chart;
+    }
+    return charts;
+  }, [series, symbol, livePrice, liveAt]);
+
+  return { data, fetchInterval };
 }

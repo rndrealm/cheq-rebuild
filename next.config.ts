@@ -6,6 +6,9 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["cheq.localhost"],
+  experimental: {
+    viewTransition: true,
+  },
   turbopack: {
     // Pin the root so a stray lockfile higher up doesn't become the workspace root.
     root: projectRoot,

@@ -11,7 +11,7 @@ export function EmptyState() {
         href={AppRoutes.createBet.path}
         className={cn(
           buttonVariants({ variant: "secondary" }),
-          // The page is gray-3 (same as --secondary), so step up to stay visible.
+          // Sits on a light gray panel, so step up from --secondary to stay visible.
           "bg-gray-4 hover:bg-gray-5",
         )}
       >

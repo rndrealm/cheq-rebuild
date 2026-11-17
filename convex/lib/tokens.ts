@@ -16,3 +16,24 @@ export function binanceApiUrl(path: string): string {
   );
   return `${base}${path}`;
 }
+
+const BINANCE_ATTEMPTS = 3;
+const BINANCE_RETRY_DELAY_MS = 250;
+
+// Fetch that rides out brief network drops to Binance. Resolves to null if
+// every attempt fails, so market data calls can report "no data" instead of
+// throwing; callers treat that the same as a bad response.
+export async function fetchBinance(url: string): Promise<Response | null> {
+  for (let attempt = 1; attempt <= BINANCE_ATTEMPTS; attempt++) {
+    try {
+      return await fetch(url);
+    } catch (err) {
+      if (attempt === BINANCE_ATTEMPTS) {
+        console.warn(`[fetchBinance] Gave up on ${url}:`, err);
+        return null;
+      }
+      await new Promise((r) => setTimeout(r, BINANCE_RETRY_DELAY_MS * attempt));
+    }
+  }
+  return null;
+}

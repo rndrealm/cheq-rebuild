@@ -1,14 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { interpolateY } from "@/lib/helpers/chart";
-import type { ChartData } from "./use-token-chart";
+import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  curveYAt,
+  formatChartTime,
+  nearestPoint,
+  type ChartData,
+} from "@/lib/helpers/chart";
 
+// Where the hover dot sits on the line (following the cursor), and the
+// nearest candle's close, change from the chart's first close, and time.
 export type CrosshairInfo = {
   normX: number;
   normY: number;
   price: number;
   change: number;
+  timeLabel: string;
 };
 
 const DRAG_THRESHOLD = 40;
@@ -18,18 +25,23 @@ const DEFAULT_CROSSHAIR: CrosshairInfo = {
   normY: 0.5,
   price: 0,
   change: 0,
+  timeLabel: "",
 };
 
+// The dot glides along the line with the cursor; the price is the nearest
+// candle's real close.
 function computeCrosshair(
   normX: number,
   data: ChartData,
 ): CrosshairInfo {
-  const normY = interpolateY(data.points, normX);
-  const price =
-    data.maxPrice -
-    ((normY - 0.1) / 0.8) * (data.maxPrice - data.minPrice);
-  const change = ((price - data.basePrice) / data.basePrice) * 100;
-  return { normX, normY, price, change };
+  const point = nearestPoint(data.points, normX);
+  return {
+    normX,
+    normY: curveYAt(data.curve, normX),
+    price: point.price,
+    change: ((point.price - data.basePrice) / data.basePrice) * 100,
+    timeLabel: formatChartTime(point.time, data.span),
+  };
 }
 
 export function useChartInteraction(
@@ -38,12 +50,10 @@ export function useChartInteraction(
   onTiltVelocity: (v: number) => void,
   onDragThresholdMet?: () => void,
 ) {
-  const [crosshair, setCrosshair] = useState<CrosshairInfo>(DEFAULT_CROSSHAIR);
+  // Cursor position across the chart (0–1); starts on the latest candle.
+  const [cursorX, setCursorX] = useState(1);
   const [isHovering, setIsHovering] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-
-  const chartDataRef = useRef(chartData);
-  chartDataRef.current = chartData;
 
   const isDraggingRef = useRef(false);
   const hasDraggedRef = useRef(false);
@@ -51,11 +61,11 @@ export function useChartInteraction(
   const prevTimeRef = useRef(0);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  useEffect(() => {
-    if (chartData) {
-      setCrosshair((prev) => computeCrosshair(prev.normX, chartData));
-    }
-  }, [chartData]);
+  // Derived, so it follows the cursor and the chart (e.g. a range change).
+  const crosshair = useMemo(
+    () => (chartData ? computeCrosshair(cursorX, chartData) : DEFAULT_CROSSHAIR),
+    [cursorX, chartData],
+  );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -87,13 +97,13 @@ export function useChartInteraction(
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!expanded || !chartDataRef.current) return;
+      if (!expanded || !chartData) return;
       const rect = e.currentTarget.getBoundingClientRect();
       const normX = Math.max(
         0,
         Math.min(1, (e.clientX - rect.left) / rect.width),
       );
-      setCrosshair(computeCrosshair(normX, chartDataRef.current));
+      setCursorX(normX);
       setIsHovering(true);
 
       const now = performance.now();
@@ -111,7 +121,7 @@ export function useChartInteraction(
       prevXRef.current = clientX;
       prevTimeRef.current = now;
     },
-    [expanded, onTiltVelocity],
+    [expanded, chartData, onTiltVelocity],
   );
 
   const handleMouseLeave = useCallback(() => {

@@ -37,6 +37,10 @@
   --info: #425eb9;
   --info-light: #b0ccff;
 
+  /* Market moves: a price going up / down */
+  --price-up: #47a95e;
+  --price-down: #e4813f;
+
   /* Grey palette (oklch neutrals) */
   --gray-1: oklch(0.993 0.002 256);
   --gray-2: oklch(0.982 0.002 256);
@@ -120,6 +124,8 @@
   --color-warning-light: var(--warning-light);
   --color-info: var(--info);
   --color-info-light: var(--info-light);
+  --color-price-up: var(--price-up);
+  --color-price-down: var(--price-down);
 
   --color-gray-1: var(--gray-1);
   --color-gray-2: var(--gray-2);
@@ -278,5 +284,110 @@ input[type="number"] {
   }
   100% {
     transform: translateX(300%);
+  }
+}
+
+/* Home <-> Feed content transition (see PageTransition). Home's content shrinks
+   into the point where Feed's main carousel card sits, and grows back out of
+   it. 245px is that card's centre measured from the top of Home's content
+   panel; keep it in step with PAGE_ORIGIN in page-transition.tsx. */
+::view-transition-old(.collapse-out) {
+  transform-origin: 50% 245px;
+  animation: 195ms cubic-bezier(0.4, 0, 1, 1) both page-shrink-out;
+}
+::view-transition-new(.collapse-in) {
+  animation: 180ms ease-out 75ms both page-fade-in;
+}
+::view-transition-old(.expand-out) {
+  animation: 100ms ease-in both page-fade-out;
+}
+::view-transition-new(.expand-in) {
+  transform-origin: 50% 245px;
+  animation: 210ms cubic-bezier(0, 0, 0.2, 1) 50ms both page-grow-in;
+}
+
+@keyframes page-shrink-out {
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes page-grow-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes page-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Headers don't move: they crossfade into each other. */
+::view-transition-old(.header-out) {
+  animation: 100ms ease-in both page-fade-out;
+}
+::view-transition-new(.header-in) {
+  animation: 180ms ease-out 75ms both page-fade-in;
+}
+
+/* The sidebar and page switch button hold still during page transitions. The
+   switch stays live so its icon morph plays through the transition. */
+::view-transition-group(app-sidebar),
+::view-transition-group(page-switch) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(app-sidebar),
+::view-transition-old(page-switch) {
+  display: none;
+}
+::view-transition-new(app-sidebar),
+::view-transition-new(page-switch) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* WipeReveal (components/ui/wipe-reveal.tsx): the skeleton overlay is masked
+   away with a soft edge once content is ready. --wipe is registered so the
+   mask position can transition. */
+@property --wipe {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+
+.wipe-reveal {
+  --wipe: 100%;
+  mask-image: linear-gradient(
+    to right,
+    black var(--wipe),
+    transparent calc(var(--wipe) + 100%)
+  );
+  transition: --wipe var(--wipe-duration, 0.6s) ease-in-out;
+}
+
+.wipe-reveal[data-revealed="true"] {
+  --wipe: -100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Still ends (so the overlay is removed), just without the sweep. */
+  .wipe-reveal {
+    transition-duration: 1ms;
   }
 }
