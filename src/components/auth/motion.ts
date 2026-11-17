@@ -49,24 +49,34 @@ export function useSwapMotion<T extends MotionProps>(normal: T): T {
 // (ease-out-back bezier); the fade eases out. Out: both ease in (slow start,
 // then away), no bounce.
 const EASE_OUT_BACK = [0.34, 1.56, 0.64, 1] as const;
-const slotButtonMotion = {
-  initial: { opacity: 0, y: 12 },
-  animate: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      y: { duration: 0.5, ease: EASE_OUT_BACK },
-      opacity: { duration: 0.25, ease: EASE_OUT },
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: 12,
-    transition: { duration: 0.2, ease: EASE_IN },
-  },
-};
+const SLOT_EXIT_DURATION = 0.2;
 
-// The slot buttons' enter/exit, honouring reduced motion
-export function useSlotButtonMotion() {
-  return useSwapMotion(slotButtonMotion);
+function slotButtonMotion(enterDelay: number) {
+  return {
+    initial: { opacity: 0, y: 12 },
+    animate: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        y: { duration: 0.5, ease: EASE_OUT_BACK, delay: enterDelay },
+        opacity: { duration: 0.25, ease: EASE_OUT, delay: enterDelay },
+      },
+    },
+    exit: {
+      opacity: 0,
+      y: 12,
+      transition: { duration: SLOT_EXIT_DURATION, ease: EASE_IN },
+    },
+  };
+}
+
+const overlappingSlotButton = slotButtonMotion(0);
+const waitingSlotButton = slotButtonMotion(SLOT_EXIT_DURATION);
+
+// The slot buttons' enter/exit, honouring reduced motion. A solid button can
+// rise in over the one leaving (it covers it); a see-through one (the ghost
+// Google button) would show the leaving button through it, so `waitForExit`
+// holds its entrance until the other has gone.
+export function useSlotButtonMotion({ waitForExit = false } = {}) {
+  return useSwapMotion(waitForExit ? waitingSlotButton : overlappingSlotButton);
 }
