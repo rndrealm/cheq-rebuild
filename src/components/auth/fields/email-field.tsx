@@ -1,6 +1,7 @@
 "use client";
 
 import { pillInputProps } from "@/components/auth/auth-field";
+import { EMAIL_PATTERN } from "@/components/auth/validation";
 
 /**
  * The email input for a pill (put it in a keyed PillField). `autoComplete`:
@@ -30,6 +31,10 @@ export function EmailField({
       <input
         id={id}
         type="email"
+        // Stricter than type="email" alone: the domain needs a dot and an
+        // ending (see EMAIL_PATTERN)
+        pattern={EMAIL_PATTERN}
+        title="An email like you@example.com"
         autoComplete={autoComplete}
         required
         value={value}

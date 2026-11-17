@@ -2,6 +2,18 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { chartPointValidator } from "./lib/chart";
 
+// A bet's token as stored. New bets only record the symbol (prices come from
+// Binance by symbol); bets made before the switch from DexScreener also carry
+// the on-chain details they were priced by, kept here as optional so those
+// documents still match. Function args validate tokens separately (symbol
+// only), so new bets can't write the old fields.
+const storedToken = v.object({
+  symbol: v.string(),
+  address: v.optional(v.string()),
+  chain: v.optional(v.string()),
+  pairAddress: v.optional(v.string()),
+});
+
 export default defineSchema({
   users: defineTable({
     authId: v.string(),
@@ -46,14 +58,8 @@ export default defineSchema({
       v.literal("cancelled"),
       v.literal("flagged"),
     ),
-    token: v.object({
-      symbol: v.string(),
-    }),
-    tokenB: v.optional(
-      v.object({
-        symbol: v.string(),
-      }),
-    ),
+    token: storedToken,
+    tokenB: v.optional(storedToken),
     betTerms: v.object({
       direction: v.optional(v.union(v.literal("up"), v.literal("down"))),
       targetPrice: v.optional(v.number()),
@@ -93,7 +99,15 @@ export default defineSchema({
         v.literal("manual"),
       ),
     ),
-    priceSource: v.optional(v.literal("binance")),
+    // Where the resolution price came from. New bets resolve on Binance; bets
+    // resolved before the switch keep their DexScreener/GeckoTerminal record.
+    priceSource: v.optional(
+      v.union(
+        v.literal("binance"),
+        v.literal("dexscreener"),
+        v.literal("geckoterminal"),
+      ),
+    ),
     counterCount: v.number(),
     updatedAt: v.number(),
   })

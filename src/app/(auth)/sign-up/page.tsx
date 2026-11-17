@@ -17,7 +17,7 @@ import { EmailField } from "@/components/auth/fields/email-field";
 import { PasswordField } from "@/components/auth/fields/password-field";
 import {
   MIN_PASSWORD_LENGTH,
-  emailReason,
+  NEW_PASSWORD_PATTERN,
   isValidEmail,
   passwordReason,
   usernameReason,
@@ -42,6 +42,9 @@ const ERROR_ID = "sign-up-error";
 // Figma puts the welcome step's Continue at 496, 54px below where the slot
 // under the (now empty) field starts
 const WELCOME_CONTINUE_TOP = "top-[54px]";
+
+// The password step shows its button once this many characters are typed
+const PASSWORD_BUTTON_AFTER = 3;
 
 const EMAIL_TAKEN = "An account with this email already exists";
 // Better Auth's codes for signing up with a registered email
@@ -139,10 +142,12 @@ export default function SignUpPage() {
       enterApp();
       return;
     }
-    // The form skips the browser's own validation (its grey tooltip doesn't
-    // fit the design), so check here: not valid yet, show the reason instead
+    // Not valid yet: the password step shows its reason under its (faded)
+    // button; the email and username steps have no button until they're
+    // valid, so the browser's own message points at the field instead
     if (!e.currentTarget.checkValidity()) {
-      flashReason();
+      if (step === "password") flashReason();
+      else e.currentTarget.reportValidity();
       return;
     }
     if (step === "email") void run(submitEmail);
@@ -175,17 +180,13 @@ export default function SignUpPage() {
 
   const errorId = error ? ERROR_ID : undefined;
 
-  // What's in the current step's field, and why it can't be submitted yet
-  const field = {
-    email: { value: email, reason: emailReason(email) },
-    username: { value: username, reason: usernameReason(username) },
-    password: { value: password, reason: passwordReason(password) },
-    welcome: { value: "", reason: undefined },
-  }[step];
-
-  // What sits under the field: the error; the step's button once there's
-  // something in the field; otherwise Google (email), the hint (password), or
-  // nothing (username). The welcome step has its own lower Continue.
+  // What sits under the field: the error, or else per step:
+  // - email: Continue once the email is valid, Google until then
+  // - username: Continue once it's valid, nothing until then
+  // - password: the button once 3 characters are typed, faded with its
+  //   reason (e.g. "Add a number") until it meets the rules; the hint before
+  //   that
+  // - welcome: its own lower Continue
   function slot() {
     if (error) {
       return (
@@ -218,28 +219,35 @@ export default function SignUpPage() {
         />
       );
     }
-    if (loading || field.value) {
+    if (step === "password") {
+      // The hint until a few characters are in, so the button (and its
+      // reasons) doesn't jump in on the very first keystroke
+      if (!loading && password.length < PASSWORD_BUTTON_AFTER) {
+        return (
+          <SlotText key="password-hint" className="whitespace-nowrap">
+            This grants you access to your account
+          </SlotText>
+        );
+      }
       return (
         <ContinueButton
           key="continue"
           form={FORM_ID}
-          label={step === "password" ? "Create account" : "Continue"}
+          label="Create account"
           pending={loading}
-          disabledReason={field.reason}
+          disabledReason={passwordReason(password)}
           reasonShown={reasonShown}
         />
       );
     }
+    const valid =
+      step === "email" ? isValidEmail(email) : !usernameReason(username);
+    if (loading || valid) {
+      return <ContinueButton key="continue" form={FORM_ID} pending={loading} />;
+    }
     if (step === "email") {
       return (
         <GoogleButton key="google" onClick={google.start} pending={google.pending} />
-      );
-    }
-    if (step === "password") {
-      return (
-        <SlotText key="password-hint" className="whitespace-nowrap">
-          This grants you access to your account
-        </SlotText>
       );
     }
     return null;
@@ -297,6 +305,7 @@ export default function SignUpPage() {
                 onValueChange={change(setPassword)}
                 autoComplete="new-password"
                 minLength={MIN_PASSWORD_LENGTH}
+                pattern={NEW_PASSWORD_PATTERN}
                 onEscape={goBack}
                 busy={loading}
                 errorId={errorId}
