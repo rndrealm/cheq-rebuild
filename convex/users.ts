@@ -1,4 +1,5 @@
 import { query, internalMutation, internalQuery } from "./_generated/server";
+import { components } from "./_generated/api";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import schema from "./schema";
@@ -15,6 +16,23 @@ export const me = query({
   args: {},
   handler: async (ctx) => {
     return await getCurrentUser(ctx);
+  },
+});
+
+// Sign-up's email step: whether an address is free to register, so a taken one
+// is caught up front rather than after picking a username and password.
+// Public and logged-out by nature. It reveals only whether an account exists
+// for an address, which sign-up itself reveals anyway. Better Auth stores
+// emails lowercased, so the lookup is too.
+export const isEmailAvailable = query({
+  args: { email: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { email }) => {
+    const user = await ctx.runQuery(components.betterAuth.adapter.findOne, {
+      model: "user",
+      where: [{ field: "email", value: email.trim().toLowerCase() }],
+    });
+    return user === null;
   },
 });
 

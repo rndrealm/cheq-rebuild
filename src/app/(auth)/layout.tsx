@@ -1,9 +1,16 @@
-import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
+import { isAuthenticated } from "@/lib/convex";
+import { AppRoutes } from "@/lib/routes";
 
-export default function AuthLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-bg-base">
-      <div className="w-full max-w-[420px] px-6">{children}</div>
-    </div>
-  );
+// Sign-in and sign-up are for people without a session: anyone already signed
+// in goes to the dashboard instead. Checked on the server when the page loads,
+// so sign-up's welcome step (shown right after the account is created, without
+// a reload) isn't affected; reloading it lands on the dashboard.
+export default async function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  if (await isAuthenticated()) redirect(AppRoutes.home.path);
+  return children;
 }

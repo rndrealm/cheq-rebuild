@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import {
   DropdownMenu,
@@ -37,6 +37,7 @@ const TILE_CLASS =
 export function AppSidebar() {
   const user = useUser();
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <aside
@@ -92,7 +93,17 @@ export function AppSidebar() {
               </span>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => signOut()}>
+            <DropdownMenuItem
+              onClick={() =>
+                signOut({
+                  fetchOptions: {
+                    // Replace, so Back doesn't return to a page that needs
+                    // the session that just ended
+                    onSuccess: () => router.replace(AppRoutes.signIn.path),
+                  },
+                })
+              }
+            >
               <SignOutIcon />
               Sign out
             </DropdownMenuItem>
