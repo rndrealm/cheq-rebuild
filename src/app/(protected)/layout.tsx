@@ -10,10 +10,7 @@ export default async function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const authed = await isAuthenticated();
-  // Sign-in rather than sign-up: whoever lands here without a session is most
-  // often a returning user (signed out, or the session expired). Sign-in links
-  // to sign-up for new people.
-  if (!authed) redirect(AppRoutes.signIn.path);
+  if (!authed) redirect(AppRoutes.auth.path);
 
   const preloadedUser = await preloadAuthQuery(api.users.me);
   return <UserProvider preloadedUser={preloadedUser}>{children}</UserProvider>;

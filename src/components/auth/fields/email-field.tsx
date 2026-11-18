@@ -5,8 +5,8 @@ import { EMAIL_PATTERN } from "@/components/auth/validation";
 
 /**
  * The email input for a pill (put it in a keyed PillField). `autoComplete`:
- * "username" where the email is the login name (sign-in), "email" where a new
- * account is being made (sign-up).
+ * "username" where the email is the login name, "email" where it's only an
+ * address.
  */
 export function EmailField({
   id,

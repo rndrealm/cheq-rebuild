@@ -1,9 +1,8 @@
 export const AppRoutes = {
-  signUp: {
-    path: "/sign-up",
-  },
-  signIn: {
-    path: "/sign-in",
+  // Signing in and signing up: one flow, branching on whether the email has
+  // an account
+  auth: {
+    path: "/auth",
   },
   home: {
     path: "/",
