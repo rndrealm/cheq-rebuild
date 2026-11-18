@@ -67,7 +67,9 @@ export function UsernameField({
           className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-7 text-sm leading-4 font-medium whitespace-pre"
         >
           <span className="invisible">{value}</span>
-          <span className="text-white/50">{USERNAME_SUFFIX}</span>
+          <span className={errorId ? "text-[#0b0b0b]/50" : "text-white/50"}>
+            {USERNAME_SUFFIX}
+          </span>
         </div>
       </RenderIf>
     </>

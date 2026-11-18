@@ -243,7 +243,7 @@ export default function AuthPage() {
   function slot() {
     if (error) {
       return (
-        <SlotText key="error" role="alert" className="font-medium">
+        <SlotText key="error" role="alert" className="font-medium text-[#0b0b0b]">
           <span id={ERROR_ID}>{error}</span>
         </SlotText>
       );

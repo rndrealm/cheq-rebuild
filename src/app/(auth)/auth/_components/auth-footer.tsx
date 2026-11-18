@@ -36,7 +36,7 @@ export function AuthFooter({
     return (
       <button
         type="button"
-        className="mx-auto block w-70.25 max-w-full rounded-[40px] px-2.5 py-3.75 text-sm leading-4 font-semibold text-white outline-none"
+        className="mx-auto block w-70.25 max-w-full rounded-[40px] px-2.5 py-3.75 text-sm leading-4 font-semibold outline-none"
       >
         Forgot Password?
       </button>

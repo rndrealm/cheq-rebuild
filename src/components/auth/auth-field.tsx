@@ -15,10 +15,13 @@ const noAutofillTint = cn(
   "autofill:[-webkit-text-fill-color:white] autofill:[caret-color:white]",
 );
 
-// A text input filling the pill
+// A text input filling the pill. Dark text when its step has an error (Figma:
+// the error context's text is #0B0B0B on the lighter red).
 const pillInputClassName = cn(
   "absolute inset-0 size-full bg-transparent px-7 text-sm leading-4 font-medium text-white outline-none placeholder:text-white disabled:opacity-60",
+  "aria-[invalid=true]:text-[#0b0b0b] aria-[invalid=true]:placeholder:text-[#0b0b0b]",
   noAutofillTint,
+  "aria-[invalid=true]:autofill:[-webkit-text-fill-color:#0b0b0b] aria-[invalid=true]:autofill:[caret-color:#0b0b0b]",
 );
 
 /**
@@ -53,8 +56,7 @@ export function AuthPill({
   children,
 }: {
   glass?: boolean;
-  // Swaps to the error glass: tinted with the error colour #E04746, with a
-  // bright top edge
+  // Swaps to the error glass, with a red border
   error?: boolean;
   children: ReactNode;
 }) {
@@ -84,10 +86,8 @@ export function AuthPill({
         className={cn(
           "pointer-events-none absolute inset-0 rounded-[40px]",
           errorTiming,
-          // The gradient runs down into the error red and the inner shadows
-          // are it (no offset, so they wrap every side evenly), so the field
-          // sits in the red rather than on it
-          "bg-[linear-gradient(179.5deg,rgba(255,255,255,0.3)_25.16%,rgba(224,71,70,0.3)_343.35%)] shadow-[inset_0px_0px_0px_1px_rgba(224,71,70,0.35),inset_0px_0px_8px_0px_rgba(224,71,70,0.5),inset_0px_1px_0px_0px_rgba(255,255,255,0.39)]",
+          // Figma's error pill: a 1px #FF3B30 border on a greyer glass
+          "border border-[#FF3B30] bg-[linear-gradient(179.97deg,rgba(232,232,232,0.3)_29.94%,rgba(84,84,84,0.3)_255.16%)] shadow-[inset_-1px_0px_0px_0px_rgba(0,0,0,0.05),inset_0px_0.5px_2px_0px_rgba(11,11,11,0.12),inset_0px_1px_0px_0px_rgba(255,255,255,0.39)]",
           !(glass && error) && "opacity-0",
         )}
       />
