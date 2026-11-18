@@ -12,7 +12,7 @@ import {
 const USERNAME_SUFFIX = ".cheq";
 
 /**
- * The username input for sign-up's pill (put it in a keyed PillField), with
+ * The username input for the new-account pill (put it in a keyed PillField), with
  * the ".cheq" suffix shown right after what's typed. Focuses itself when its
  * step opens; Escape calls `onEscape` (the step's back).
  */
@@ -67,7 +67,9 @@ export function UsernameField({
           className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-7 text-sm leading-4 font-medium whitespace-pre"
         >
           <span className="invisible">{value}</span>
-          <span className="text-white/50">{USERNAME_SUFFIX}</span>
+          <span className={errorId ? "text-[#0b0b0b]/50" : "text-white/50"}>
+            {USERNAME_SUFFIX}
+          </span>
         </div>
       </RenderIf>
     </>

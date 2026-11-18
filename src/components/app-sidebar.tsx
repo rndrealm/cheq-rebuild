@@ -99,7 +99,7 @@ export function AppSidebar() {
                   fetchOptions: {
                     // Replace, so Back doesn't return to a page that needs
                     // the session that just ended
-                    onSuccess: () => router.replace(AppRoutes.signIn.path),
+                    onSuccess: () => router.replace(AppRoutes.auth.path),
                   },
                 })
               }

@@ -187,7 +187,11 @@ export function AuthScene({
               hangs below the field area: the welcome step's lower Continue
               (~60px) and the reason tooltip. */}
           <motion.div
-            className="relative mt-auto w-full max-w-[680px] pt-20 text-center text-sm leading-4 text-white"
+            // Dark in the error context (Figma), like the field's text
+            className={cn(
+              "relative mt-auto w-full max-w-[680px] pt-20 text-center text-sm leading-4 transition-colors duration-600 motion-reduce:transition-none",
+              error ? "text-[#0b0b0b]" : "text-white",
+            )}
             {...(reduced ? instant(footerEntrance) : footerEntrance)}
           >
             {/* A new `footerKey` swaps the footer: the old one out, then the

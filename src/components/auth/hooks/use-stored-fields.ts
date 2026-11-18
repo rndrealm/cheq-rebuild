@@ -11,10 +11,8 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 // read through useSyncExternalStore so the browser gets the stored values on
 // its first render, with no extra effect pass.
 
-// Session storage keys for each form. Sign-up writes the sign-in one for
-// "Sign in instead" (see handOffEmailToSignIn), so the email carries across.
-export const SIGN_IN_FIELDS_KEY = "cheq:sign-in";
-export const SIGN_UP_FIELDS_KEY = "cheq:sign-up";
+// The session storage key for the auth flow's fields
+export const AUTH_FIELDS_KEY = "cheq:auth";
 
 // key -> the stored JSON string (a string, so snapshots compare by value)
 const memory = new Map<string, string>();
@@ -100,23 +98,19 @@ export function useStoredFields<F extends string>(
   return { values, setField };
 }
 
-// Puts an email where sign-in reads its own: sign-up's "Sign in instead", and
-// a new account (so sign-in offers the latest account after sign-out)
-export function handOffEmailToSignIn(email: string) {
-  write(SIGN_IN_FIELDS_KEY, JSON.stringify({ email }));
-}
-
 /**
- * Forgets the fields stored under `key` (once signed in or up, so the next
- * visit to that form starts empty). Deliberately doesn't notify: the current
- * page keeps showing its values while it navigates away, rather than flashing
- * empty fields (and redirecting back a step) on the way out.
+ * Replaces the fields stored under `key` with `values` (once signed in or up:
+ * only the email is kept, so the next visit offers the latest account).
+ * Deliberately doesn't notify: the current page keeps showing its values
+ * while it navigates away, rather than flashing changed fields (and
+ * redirecting back a step) on the way out.
  */
-export function clearStoredFields(key: string) {
-  memory.delete(key);
+export function replaceStoredFields(key: string, values: Record<string, string>) {
+  const json = JSON.stringify(values);
+  memory.set(key, json);
   try {
-    sessionStorage.removeItem(key);
+    sessionStorage.setItem(key, json);
   } catch {
-    // Nothing stored
+    // No storage: the in-memory copy still works for this page
   }
 }

@@ -28,6 +28,13 @@ const nextConfig: NextConfig = {
     });
     return config;
   },
+  // Sign-in and sign-up are one flow at /auth now; old links still land there
+  async redirects() {
+    return [
+      { source: "/sign-in", destination: "/auth", permanent: false },
+      { source: "/sign-up", destination: "/auth", permanent: false },
+    ];
+  },
   transpilePackages: ["three", "@react-three/fiber", "@react-three/drei"],
 };
 

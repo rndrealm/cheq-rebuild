@@ -10,6 +10,10 @@ import { useHydrated } from "@/components/auth/hooks/use-hydrated";
  * between steps. Uses the native history API, which Next's router stays in
  * sync with.
  *
+ * The steps can branch: `previous` maps each step to the one before it (the
+ * first step has none). Left out, the steps are a straight line in `steps`
+ * order.
+ *
  * `requires(step)` names an earlier step to send the user back to when the
  * current one can't work yet (e.g. the password step without an email, from
  * an old link or a fresh tab), or nothing if it can. Checked once the page is
@@ -21,18 +25,43 @@ import { useHydrated } from "@/components/auth/hooks/use-hydrated";
  *   current one instead)
  * - `back()`: one step back. Uses the browser's Back when the previous history
  *   entry is the previous step, so the history stays in step with the screen
- * - `backTo(step)`: the same, several steps at once
+ * - `backTo(step)`: the same, several steps at once (to a step on the way here)
  * - `isOn(step)`: whether the URL is still on a step (for a request that
  *   finishes after the user has moved on)
  */
 export function useAuthStep<S extends string>(
   steps: readonly S[],
-  requires?: (step: S) => S | undefined,
+  {
+    previous,
+    requires,
+  }: {
+    previous?: Partial<Record<S, S>>;
+    requires?: (step: S) => S | undefined;
+  } = {},
 ) {
   const params = useSearchParams();
   const raw = params.get("step");
   const step = steps.find((s) => s === raw) ?? steps[0];
   const hydrated = useHydrated();
+
+  const before = useCallback(
+    (s: S): S | undefined => {
+      if (previous) return previous[s];
+      const index = steps.indexOf(s);
+      return index > 0 ? steps[index - 1] : undefined;
+    },
+    [previous, steps],
+  );
+
+  // The steps from the first to `s`, e.g. email → username → new-password
+  const pathTo = useCallback(
+    (s: S) => {
+      const path = [s];
+      for (let p = before(s); p; p = before(p)) path.unshift(p);
+      return path;
+    },
+    [before],
+  );
 
   const go = useCallback(
     (next: S, mode: "push" | "replace" = "push") => {
@@ -43,7 +72,7 @@ export function useAuthStep<S extends string>(
       const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
       // Next merges this with its own history state; `authStep` marks which
       // step the entry is, for backTo()
-      const state = { authStep: steps.indexOf(next) };
+      const state = { authStep: next };
       if (mode === "push") window.history.pushState(state, "", url);
       else window.history.replaceState(state, "", url);
     },
@@ -52,24 +81,26 @@ export function useAuthStep<S extends string>(
 
   const backTo = useCallback(
     (target: S) => {
-      const from = steps.indexOf(step);
-      const to = steps.indexOf(target);
+      const path = pathTo(step);
+      const from = path.length - 1;
+      const to = path.indexOf(target);
       if (to < 0 || to >= from) return;
       // This entry was pushed as this step, so the entries before it are the
-      // steps before it: go back through history rather than adding to it
-      if (window.history.state?.authStep === from) {
+      // steps on the way here: go back through history rather than adding to
+      // it
+      if (window.history.state?.authStep === step) {
         window.history.go(to - from);
       } else {
         go(target, "replace");
       }
     },
-    [step, steps, go],
+    [step, pathTo, go],
   );
 
   const back = useCallback(() => {
-    const index = steps.indexOf(step);
-    if (index > 0) backTo(steps[index - 1]);
-  }, [step, steps, backTo]);
+    const p = before(step);
+    if (p) backTo(p);
+  }, [step, before, backTo]);
 
   const isOn = useCallback(
     (s: S) =>
